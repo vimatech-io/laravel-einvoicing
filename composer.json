@@ -1,0 +1,72 @@
+{
+    "name": "vimatech/laravel-einvoicing",
+    "description": "Generate compliant structured e-invoices (Peppol BIS 3.0 UBL, EN 16931 CII) natively and dispatch them through pluggable networks. Zero third-party runtime dependencies.",
+    "keywords": [
+        "laravel",
+        "einvoicing",
+        "e-invoicing",
+        "peppol",
+        "ubl",
+        "cii",
+        "en16931",
+        "facturx",
+        "invoice"
+    ],
+    "homepage": "https://github.com/vimatech-io/laravel-einvoicing",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Adel Zemzemi",
+            "email": "hello@adelzemzemi.dev"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "ext-dom": "*",
+        "ext-xmlwriter": "*",
+        "ext-libxml": "*",
+        "ext-mbstring": "*",
+        "illuminate/support": "^11.0 || ^12.0 || ^13.0",
+        "illuminate/contracts": "^11.0 || ^12.0 || ^13.0",
+        "illuminate/http": "^11.0 || ^12.0 || ^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0 || ^10.0 || ^11.0",
+        "pestphp/pest": "^3.0 || ^4.0",
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.18"
+    },
+    "autoload": {
+        "psr-4": {
+            "Vimatech\\EInvoicing\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Vimatech\\EInvoicing\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Vimatech\\EInvoicing\\EInvoicingServiceProvider"
+            ],
+            "aliases": {
+                "EInvoice": "Vimatech\\EInvoicing\\Facades\\EInvoice"
+            }
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/pest",
+        "analyse": "vendor/bin/phpstan analyse --memory-limit=512M",
+        "format": "vendor/bin/pint"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
