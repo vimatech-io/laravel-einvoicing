@@ -28,6 +28,12 @@ return [
     | fully-qualified class implementing EInvoiceNetwork. Everything else is
     | passed through to the driver as configuration.
     |
+    | HTTP drivers read: base_url, token, auth ("token" by default, or "none"
+    | when the partner authenticates by mutual TLS or a signed header), timeout,
+    | headers, verify, paths and status_map. A setting that cannot be read as
+    | the type it needs raises InvalidDriverConfig instead of being ignored;
+    | environment strings such as "120" and "false" are understood.
+    |
     | Credentials must come from the environment; never commit secrets.
     |
     */
@@ -38,7 +44,7 @@ return [
             'driver' => 'peppol',
             'base_url' => env('PEPPOL_BASE_URL'),
             'token' => env('PEPPOL_API_TOKEN'),
-            'timeout' => (int) env('PEPPOL_TIMEOUT', 30),
+            'timeout' => env('PEPPOL_TIMEOUT', 30),
             'countries' => [],
             'headers' => [],
 
@@ -58,7 +64,7 @@ return [
             'driver' => 'fr_pdp',
             'base_url' => env('FR_PDP_BASE_URL'),
             'token' => env('FR_PDP_API_TOKEN'),
-            'timeout' => (int) env('FR_PDP_TIMEOUT', 30),
+            'timeout' => env('FR_PDP_TIMEOUT', 30),
             'countries' => ['FR'],
             'headers' => [],
             'paths' => [

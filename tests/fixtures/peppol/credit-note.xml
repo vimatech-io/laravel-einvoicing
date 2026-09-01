@@ -10,7 +10,7 @@
   <cbc:BuyerReference>PO-98765</cbc:BuyerReference>
   <cac:AccountingSupplierParty>
     <cac:Party>
-      <cbc:EndpointID schemeID="0208">0208:0123456789</cbc:EndpointID>
+      <cbc:EndpointID schemeID="0208">0123456789</cbc:EndpointID>
       <cac:PartyIdentification>
         <cbc:ID schemeID="0208">0123456789</cbc:ID>
       </cac:PartyIdentification>
@@ -41,7 +41,7 @@
   </cac:AccountingSupplierParty>
   <cac:AccountingCustomerParty>
     <cac:Party>
-      <cbc:EndpointID schemeID="0208">0208:9876543210</cbc:EndpointID>
+      <cbc:EndpointID schemeID="0208">9876543210</cbc:EndpointID>
       <cac:PartyIdentification>
         <cbc:ID schemeID="0208">9876543210</cbc:ID>
       </cac:PartyIdentification>

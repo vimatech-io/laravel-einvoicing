@@ -73,13 +73,13 @@ final class FrPdpDriver extends AbstractHttpDriver
 
         $documents = [];
         foreach ($this->payloadList($response, 'invoices') as $item) {
-            $raw = $item['content'] ?? null;
+            $messageId = $this->stringOrNull($item['id'] ?? null) ?? '';
 
             $documents[] = new InboundDocument(
                 network: $this->key,
-                messageId: $this->stringOrNull($item['id'] ?? null) ?? '',
+                messageId: $messageId,
                 format: Format::tryFrom($this->stringOrNull($item['format'] ?? null) ?? 'cii') ?? Format::Cii,
-                contents: is_string($raw) ? (base64_decode($raw, true) ?: $raw) : '',
+                contents: $this->decodeInbound($item['content'] ?? null, $messageId),
                 senderId: $this->stringOrNull($item['supplier'] ?? null),
                 receivedAt: new DateTimeImmutable,
                 raw: $item,

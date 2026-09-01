@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Request;
 use Vimatech\EInvoicing\Enums\LifecycleStatus;
+use Vimatech\EInvoicing\Exceptions\InvalidDriverConfig;
 use Vimatech\EInvoicing\Exceptions\NetworkException;
 use Vimatech\EInvoicing\Formats\UblGenerator;
 use Vimatech\EInvoicing\Networks\PeppolDriver;
@@ -39,7 +40,7 @@ it('posts the document and maps the partner status', function () {
         return $request->url() === 'https://ap.example.test/api/documents'
             && $request->hasHeader('Authorization', 'Bearer secret-token')
             && $body['format'] === 'ubl'
-            && $body['receiver']['id'] === '0208:9876543210'
+            && $body['receiver']['id'] === '9876543210'
             && $body['document'] === $document->toBase64();
     });
 });
@@ -100,5 +101,28 @@ it('fails fast when no base_url is configured', function () {
 
     expect(fn () => (new PeppolDriver(new HttpFactory, [], 'peppol'))
         ->send((new UblGenerator)->generate($invoice), $invoice))
-        ->toThrow(NetworkException::class, 'base_url');
+        ->toThrow(InvalidDriverConfig::class, 'base_url');
+});
+
+it('refuses an inbound document whose body is not valid base64', function () {
+    $http = new HttpFactory;
+    $http->fake([
+        '*/inbound' => $http->response([
+            'documents' => [['id' => 'in-2', 'document' => '<Invoice>corrupt</Invoice>']],
+        ], 200),
+    ]);
+
+    expect(fn () => peppolDriver($http)->receive())
+        ->toThrow(NetworkException::class, 'in-2');
+});
+
+it('decodes an inbound body that base64-decodes to a falsy string', function () {
+    $http = new HttpFactory;
+    $http->fake([
+        '*/inbound' => $http->response([
+            'documents' => [['id' => 'in-3', 'document' => base64_encode('0')]],
+        ], 200),
+    ]);
+
+    expect(peppolDriver($http)->receive()[0]->contents)->toBe('0');
 });

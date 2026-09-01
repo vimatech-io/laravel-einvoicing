@@ -11,17 +11,14 @@ use Illuminate\Http\Client\Response;
 use Throwable;
 use Vimatech\EInvoicing\Contracts\EInvoiceNetwork;
 use Vimatech\EInvoicing\Enums\LifecycleStatus;
+use Vimatech\EInvoicing\Exceptions\EInvoicingException;
+use Vimatech\EInvoicing\Exceptions\InvalidDriverConfig;
 use Vimatech\EInvoicing\Exceptions\NetworkException;
 
 /**
  * Shared HTTP plumbing for REST-based partner networks.
  *
- * Concrete drivers map their partner's request/response shapes onto the
- * package's neutral DTOs. The HTTP client is Laravel's own
- * (illuminate/http) — no third-party dependency is introduced.
- *
- * Recognised config keys: base_url, token, timeout, headers, verify,
- * status_map and paths (see the published config for details).
+ * Config keys: base_url, token, auth, timeout, headers, verify, status_map, paths.
  */
 abstract class AbstractHttpDriver implements EInvoiceNetwork
 {
@@ -35,7 +32,7 @@ abstract class AbstractHttpDriver implements EInvoiceNetwork
         array $config,
         protected readonly string $key,
     ) {
-        $this->config = new DriverConfig($config);
+        $this->config = new DriverConfig($key, $config);
     }
 
     public function key(): string
@@ -43,15 +40,12 @@ abstract class AbstractHttpDriver implements EInvoiceNetwork
         return $this->key;
     }
 
-    /**
-     * A pre-configured request bound to the partner base URL and credentials.
-     */
     protected function request(): PendingRequest
     {
         $baseUrl = $this->config->string('base_url');
 
         if ($baseUrl === '') {
-            throw NetworkException::transport($this->key, 'no base_url is configured');
+            throw InvalidDriverConfig::missing($this->key, 'base_url', 'Set it to the partner API root before dispatching.');
         }
 
         $request = $this->http
@@ -65,18 +59,40 @@ abstract class AbstractHttpDriver implements EInvoiceNetwork
             $request = $request->withoutVerifying();
         }
 
-        $token = $this->config->string('token');
-        if ($token !== '') {
-            $request = $request->withToken($token);
-        }
-
-        return $request;
+        return $this->authenticate($request);
     }
 
     /**
-     * Execute an HTTP exchange, normalising any transport or HTTP-status
-     * failure into a single NetworkException so drivers stay free of
-     * repetitive try/catch boilerplate.
+     * Refuses rather than letting an unauthenticated request reach an accredited
+     * platform, where it is rejected without a usable reason.
+     */
+    private function authenticate(PendingRequest $request): PendingRequest
+    {
+        $mode = $this->config->string('auth', 'token');
+        $token = $this->config->string('token');
+
+        if ($mode !== 'token' && $mode !== 'none') {
+            throw InvalidDriverConfig::expected($this->key, 'auth', 'either "token" or "none"', $mode);
+        }
+
+        if ($mode === 'none') {
+            if ($token !== '') {
+                throw InvalidDriverConfig::contradiction($this->key, 'a token is configured while "auth" is "none". Remove one of the two.');
+            }
+
+            return $request;
+        }
+
+        if ($token === '') {
+            throw InvalidDriverConfig::missing($this->key, 'token', 'Set it, or set "auth" => "none" when the partner authenticates another way (mutual TLS, a signed header).');
+        }
+
+        return $request->withToken($token);
+    }
+
+    /**
+     * A misconfiguration raised while building the request is not a transport
+     * failure and must not be presented as one; retrying it never succeeds.
      *
      * @param  Closure(): Response  $exchange
      *
@@ -86,15 +102,39 @@ abstract class AbstractHttpDriver implements EInvoiceNetwork
     {
         try {
             return $exchange()->throw();
+        } catch (EInvoicingException $e) {
+            throw $e;
         } catch (Throwable $e) {
-            throw NetworkException::transport($this->key, $e->getMessage());
+            throw NetworkException::transport($this->key, $e->getMessage(), $e);
         }
     }
 
     /**
-     * Translate a partner-specific status string into a canonical lifecycle
-     * status, honouring any per-driver override map from config.
+     * Override in a driver whose partner returns an unencoded body; never widen
+     * this to accept both, which cannot be told apart and silently yields a
+     * corrupt invoice.
+     *
+     * @throws NetworkException
      */
+    protected function decodeInbound(mixed $value, string $messageId): string
+    {
+        if (! is_string($value) || $value === '') {
+            throw NetworkException::malformedInbound($this->key, $messageId, 'the document body is absent');
+        }
+
+        $decoded = base64_decode($value, true);
+
+        if ($decoded === false) {
+            throw NetworkException::malformedInbound($this->key, $messageId, 'the document body is not valid base64');
+        }
+
+        if ($decoded === '') {
+            throw NetworkException::malformedInbound($this->key, $messageId, 'the document body decodes to an empty payload');
+        }
+
+        return $decoded;
+    }
+
     protected function mapStatus(?string $providerStatus): LifecycleStatus
     {
         if ($providerStatus === null) {
@@ -112,8 +152,6 @@ abstract class AbstractHttpDriver implements EInvoiceNetwork
     }
 
     /**
-     * Decode a JSON object response into a string-keyed array.
-     *
      * @return array<string, mixed>
      */
     protected function payload(Response $response): array
@@ -133,8 +171,6 @@ abstract class AbstractHttpDriver implements EInvoiceNetwork
     }
 
     /**
-     * Decode a JSON list response, preferring a wrapper key when present.
-     *
      * @return list<array<string, mixed>>
      */
     protected function payloadList(Response $response, string $wrapperKey): array
@@ -171,9 +207,7 @@ abstract class AbstractHttpDriver implements EInvoiceNetwork
         return is_scalar($value) ? (string) $value : null;
     }
 
-    /**
-     * Built-in mapping for common partner vocabularies; overridable per driver.
-     */
+    /** Common partner vocabularies; overridable per driver. */
     protected function defaultStatusMap(string $normalised): LifecycleStatus
     {
         return match ($normalised) {
