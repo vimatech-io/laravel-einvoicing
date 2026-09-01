@@ -20,7 +20,7 @@ final class InvoiceFactory
         return new Party(
             name: 'SupplierTradingName Ltd.',
             countryCode: 'BE',
-            endpointId: '0208:0123456789',
+            endpointId: '0123456789',
             endpointScheme: '0208',
             vatId: 'BE0123456789',
             legalRegistrationId: '0123456789',
@@ -39,7 +39,7 @@ final class InvoiceFactory
         return new Party(
             name: 'BuyerTradingName AS',
             countryCode: 'BE',
-            endpointId: '0208:9876543210',
+            endpointId: '9876543210',
             endpointScheme: '0208',
             vatId: 'BE9876543210',
             legalRegistrationId: '9876543210',

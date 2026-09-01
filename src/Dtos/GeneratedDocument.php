@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Vimatech\EInvoicing\Dtos;
 
 use Vimatech\EInvoicing\Enums\Format;
+use Vimatech\EInvoicing\Exceptions\EInvoicingException;
 
 /**
  * An immutable, fully-rendered structured document ready to be transmitted or
@@ -47,12 +48,18 @@ final readonly class GeneratedDocument
 
     /**
      * Persist the payload to disk and return the bytes written.
+     *
+     * @throws EInvoicingException when the file cannot be written
      */
     public function save(string $path): int
     {
         $bytes = file_put_contents($path, $this->contents);
 
-        return $bytes === false ? 0 : $bytes;
+        if ($bytes === false) {
+            throw new EInvoicingException("Could not write the generated document for invoice \"{$this->invoiceNumber}\" to \"{$path}\".");
+        }
+
+        return $bytes;
     }
 
     public function __toString(): string

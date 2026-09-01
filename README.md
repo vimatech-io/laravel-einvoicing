@@ -20,7 +20,8 @@ networks (Peppol access points, French PDPs), with per-country routing — for L
 - **Per-country routing** — map destination countries to networks, with a fallback and a
   per-tenant override hook.
 - **Native validation** — mandatory-field and arithmetic checks (EN 16931 subset) fail fast with
-  actionable messages before anything is rendered or transmitted.
+  actionable messages before anything is rendered or transmitted. Arithmetic checks allow a fixed
+  0.02 tolerance to absorb per-line rounding.
 - **Lifecycle events** — `EInvoiceGenerated`, `EInvoiceDispatched`, `EInvoiceDelivered`,
   `EInvoiceRejected`, `EInvoiceReceived`.
 
@@ -28,7 +29,7 @@ networks (Peppol access points, French PDPs), with per-country routing — for L
 
 - PHP 8.3+
 - Laravel 11, 12 or 13
-- Extensions: `ext-dom`, `ext-xmlwriter`, `ext-libxml`, `ext-mbstring`
+- Extensions: `ext-dom`, `ext-mbstring`
 
 ## Installation
 
@@ -58,8 +59,8 @@ $invoice = new CanonicalInvoice(
     seller: new Party(
         name: 'Acme Trading Ltd.',
         countryCode: 'BE',
-        endpointId: '0208:0123456789',   // Peppol electronic address (BT-34)
-        endpointScheme: '0208',          // EAS scheme id
+        endpointId: '0123456789',        // Peppol electronic address (BT-34), bare
+        endpointScheme: '0208',          // EAS scheme id, emitted as schemeID
         vatId: 'BE0123456789',
         legalRegistrationId: '0123456789',
         legalRegistrationScheme: '0208',
@@ -70,7 +71,7 @@ $invoice = new CanonicalInvoice(
     buyer: new Party(
         name: 'Globex NV',
         countryCode: 'BE',
-        endpointId: '0208:9876543210',
+        endpointId: '9876543210',
         endpointScheme: '0208',
         vatId: 'BE9876543210',
         street: 'Market square 9',
@@ -155,23 +156,43 @@ Resolve a network yourself:
 EInvoice::route('BE');        // network responsible for Belgium
 EInvoice::network('peppol');  // a network by key
 
-$status = EInvoice::network('peppol')->fetchStatus($result->messageId);
+// messageId is null when the network returned none (NullDriver, a partner that
+// does not acknowledge with an id), so guard before polling.
+if ($result->messageId !== null) {
+    $status = EInvoice::network('peppol')->fetchStatus($result->messageId);
+}
 ```
+
+`send()` always fires `EInvoiceDispatched`. `EInvoiceDelivered` fires only for `Delivered` and
+`Accepted`, `EInvoiceRejected` only for `Rejected` and `Failed`. A queued submission, a document
+still in transit, or a status your `status_map` does not cover fires neither — poll `fetchStatus()`
+rather than treating the absence of a delivery as a refusal.
 
 ### 4. Receive inbound documents
 
 ```php
 foreach (EInvoice::receive('peppol') as $inbound) {
-    $inbound->contents;  // raw XML
+    $inbound->contents;  // decoded document body
     $inbound->senderId;  // sender electronic address
 }
 // each inbound document also fires an EInvoiceReceived event
 ```
 
+Bodies arrive base64-encoded. A body that is absent, that is not valid base64, or that decodes to
+nothing raises `NetworkException` naming the offending message id, and the whole batch stops — the
+package will not hand your application a document it could not decode. If your partner returns
+unencoded bodies, extend the driver and override `decodeInbound()`; do not make it accept both,
+since the two cannot be told apart and the wrong guess silently yields a corrupt invoice.
+
 ## Configuration
 
 `config/einvoicing.php` declares the available **networks**, the **country → network** routing
 table, and the default format. Credentials come from the environment.
+
+HTTP drivers read `base_url`, `token`, `auth`, `timeout`, `headers`, `verify`, `paths` and
+`status_map`. A setting that is present but cannot be read as the type it needs raises
+`InvalidDriverConfig` rather than being ignored, and environment strings such as `"120"` and
+`"false"` are understood — a value you set is either applied or reported, never dropped.
 
 ```php
 'networks' => [
@@ -206,6 +227,7 @@ point / PDP by overriding `paths` and, where the vocabulary differs, `status_map
     'driver' => 'peppol',
     'base_url' => env('PEPPOL_BASE_URL'),
     'token' => env('PEPPOL_API_TOKEN'),
+    'timeout' => env('PEPPOL_TIMEOUT', 30),
     'paths' => [
         'send' => '/v2/outbound',
         'status' => '/v2/messages/{id}',
@@ -215,6 +237,19 @@ point / PDP by overriding `paths` and, where the vocabulary differs, `status_map
         'in_progress' => 'in_transit',
         'done' => 'delivered',
     ],
+],
+```
+
+A missing or empty `token` is refused: an unauthenticated request to an accredited platform is
+rejected without a reason you can act on. When your partner authenticates another way — mutual
+TLS, a signed header — declare it, and configure no token:
+
+```php
+'peppol' => [
+    'driver' => 'peppol',
+    'base_url' => env('PEPPOL_BASE_URL'),
+    'auth' => 'none',
+    'headers' => ['X-Api-Signature' => env('PEPPOL_SIGNATURE')],
 ],
 ```
 
@@ -233,8 +268,11 @@ Unmatched countries throw `UnsupportedCountry` unless a `fallback` network is se
 
 ### Per-tenant routing override
 
-Register a resolver (e.g. in a service provider) to override routing per tenant or per invoice.
-Returning a network key wins over the static map; returning `null` defers to it:
+Register a resolver **in a service provider** to override routing per tenant or per invoice.
+Returning a network key wins over the static map; returning `null` defers to it. The router is a
+singleton, so the resolver lives for the whole process: under Octane, registering it inside a
+request leaks it to every later request on that worker. Resolve the tenant inside the closure, as
+below, rather than closing over one:
 
 ```php
 use Vimatech\EInvoicing\Facades\EInvoice;
@@ -285,7 +323,14 @@ Reference it by class in config (it is resolved from the container):
 ],
 ```
 
-Or register a factory at runtime:
+Or register a factory for a driver alias at runtime. `extend()` is keyed by the **driver** name,
+so the network entry must name that alias:
+
+```php
+'networks' => [
+    'acme' => ['driver' => 'acme', 'base_url' => env('ACME_BASE_URL')],
+],
+```
 
 ```php
 app(\Vimatech\EInvoicing\Networks\NetworkManager::class)
@@ -342,7 +387,7 @@ Run the suite:
 ```bash
 composer test      # Pest + orchestra/testbench
 composer analyse   # PHPStan level max
-composer lint      # Laravel Pint
+composer format    # Laravel Pint
 ```
 
 ## Architecture

@@ -6,6 +6,7 @@ namespace Vimatech\EInvoicing\Formats\Support;
 
 use DOMDocument;
 use DOMElement;
+use Vimatech\EInvoicing\Exceptions\EInvoicingException;
 
 /**
  * A thin, namespace-aware convenience layer over ext-dom.
@@ -85,7 +86,13 @@ final class DomBuilder
 
     public function toXml(): string
     {
-        return (string) $this->dom->saveXML();
+        $xml = $this->dom->saveXML();
+
+        if ($xml === false || $xml === '') {
+            throw new EInvoicingException('The document could not be serialised to XML.');
+        }
+
+        return $xml;
     }
 
     private function resolveNamespace(string $qualifiedName): string

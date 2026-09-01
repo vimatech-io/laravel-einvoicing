@@ -59,7 +59,7 @@ it('requires either a buyer reference or an order reference', function () {
 });
 
 it('requires a seller VAT id for standard-rated VAT', function () {
-    $seller = new Party(name: 'No VAT Ltd', countryCode: 'BE', endpointId: '0208:1', endpointScheme: '0208');
+    $seller = new Party(name: 'No VAT Ltd', countryCode: 'BE', endpointId: '1', endpointScheme: '0208');
 
     $violations = (new InvoiceValidator)->collect(invoiceWith(['seller' => $seller]));
 

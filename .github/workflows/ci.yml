@@ -77,4 +77,4 @@ jobs:
         run: vendor/bin/pint --test
 
       - name: Run PHPStan
-        run: vendor/bin/phpstan analyse
+        run: composer analyse

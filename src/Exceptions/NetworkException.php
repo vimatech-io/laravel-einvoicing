@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Vimatech\EInvoicing\Exceptions;
 
+use Throwable;
+
 /**
- * Thrown when a network driver fails to communicate with its remote partner.
+ * Thrown when a network driver fails to reach its remote partner, or when the
+ * partner returns something the driver cannot use.
  */
 final class NetworkException extends EInvoicingException
 {
@@ -14,8 +17,15 @@ final class NetworkException extends EInvoicingException
         return new self("No e-invoicing network driver is configured for key \"{$key}\".");
     }
 
-    public static function transport(string $network, string $reason): self
+    public static function transport(string $network, string $reason, ?Throwable $previous = null): self
     {
-        return new self("The \"{$network}\" network failed: {$reason}");
+        return new self("The \"{$network}\" network failed: {$reason}", 0, $previous);
+    }
+
+    public static function malformedInbound(string $network, string $messageId, string $reason): self
+    {
+        $document = $messageId === '' ? 'a document' : "document \"{$messageId}\"";
+
+        return new self("The \"{$network}\" network returned {$document} that cannot be read: {$reason}.");
     }
 }

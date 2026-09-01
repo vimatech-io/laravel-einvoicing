@@ -12,6 +12,7 @@ use Vimatech\EInvoicing\Dtos\DispatchResult;
 use Vimatech\EInvoicing\Dtos\GeneratedDocument;
 use Vimatech\EInvoicing\Dtos\InboundDocument;
 use Vimatech\EInvoicing\Enums\Format;
+use Vimatech\EInvoicing\Enums\LifecycleStatus;
 use Vimatech\EInvoicing\Events\EInvoiceDelivered;
 use Vimatech\EInvoicing\Events\EInvoiceDispatched;
 use Vimatech\EInvoicing\Events\EInvoiceGenerated;
@@ -42,9 +43,6 @@ final class EInvoiceManager
         private readonly Format $defaultFormat = Format::Ubl,
     ) {}
 
-    /**
-     * Resolve the generator for a format. Chain ->generate($invoice) to render.
-     */
     public function format(Format $format): FormatGenerator
     {
         return $this->generators[$format->value] ??= match ($format) {
@@ -54,9 +52,6 @@ final class EInvoiceManager
         };
     }
 
-    /**
-     * Render an invoice and dispatch the EInvoiceGenerated event.
-     */
     public function generate(CanonicalInvoice $invoice, ?Format $format = null): GeneratedDocument
     {
         $document = $this->format($format ?? $this->defaultFormat)->generate($invoice);
@@ -66,17 +61,11 @@ final class EInvoiceManager
         return $document;
     }
 
-    /**
-     * Resolve a network by its configuration key.
-     */
     public function network(string $key): EInvoiceNetwork
     {
         return $this->networks->network($key);
     }
 
-    /**
-     * Resolve the network responsible for a destination country.
-     */
     public function route(string $country): EInvoiceNetwork
     {
         return $this->router->routeFor($country);
@@ -93,8 +82,9 @@ final class EInvoiceManager
     }
 
     /**
-     * High-level: render (if needed), route by buyer country (or use an explicit
-     * network), transmit, and dispatch lifecycle events.
+     * A status that is neither a delivery nor a refusal — a queued submission, a
+     * status the partner vocabulary does not cover — dispatches EInvoiceDispatched
+     * alone. Poll fetchStatus() for the outcome.
      */
     public function send(
         CanonicalInvoice $invoice,
@@ -111,18 +101,16 @@ final class EInvoiceManager
 
         $this->events->dispatch(new EInvoiceDispatched($invoice, $document, $result));
 
-        if ($result->status->isSuccessful()) {
-            $this->events->dispatch(new EInvoiceDelivered($result, $invoice));
-        } else {
-            $this->events->dispatch(new EInvoiceRejected($result, $invoice));
-        }
+        match ($result->status) {
+            LifecycleStatus::Delivered, LifecycleStatus::Accepted => $this->events->dispatch(new EInvoiceDelivered($result, $invoice)),
+            LifecycleStatus::Rejected, LifecycleStatus::Failed => $this->events->dispatch(new EInvoiceRejected($result, $invoice)),
+            default => null,
+        };
 
         return $result;
     }
 
     /**
-     * Pull inbound documents from a network and dispatch EInvoiceReceived per item.
-     *
      * @return list<InboundDocument>
      */
     public function receive(string $networkKey): array
@@ -136,9 +124,6 @@ final class EInvoiceManager
         return $documents;
     }
 
-    /**
-     * Swap a network for an in-memory fake and return it for assertions.
-     */
     public function fake(string $networkKey): FakeDriver
     {
         return $this->networks->fake($networkKey);

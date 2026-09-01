@@ -111,16 +111,13 @@ final class PeppolDriver extends AbstractHttpDriver
      */
     private function toInbound(array $item): InboundDocument
     {
-        $raw = $item['document'] ?? null;
-        $contents = is_string($raw)
-            ? (base64_decode($raw, true) ?: $raw)
-            : ($this->stringOrNull($item['payload'] ?? null) ?? '');
+        $messageId = $this->stringOrNull($item['id'] ?? $item['messageId'] ?? null) ?? '';
 
         return new InboundDocument(
             network: $this->key,
-            messageId: $this->stringOrNull($item['id'] ?? $item['messageId'] ?? null) ?? '',
+            messageId: $messageId,
             format: Format::tryFrom($this->stringOrNull($item['format'] ?? null) ?? 'ubl') ?? Format::Ubl,
-            contents: $contents,
+            contents: $this->decodeInbound($item['document'] ?? null, $messageId),
             senderId: $this->stringOrNull($item['sender'] ?? null),
             receivedAt: new DateTimeImmutable,
             raw: $item,
