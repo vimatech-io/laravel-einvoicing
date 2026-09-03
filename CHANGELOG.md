@@ -7,6 +7,32 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `PrecedingInvoiceReference` DTO and the optional `CanonicalInvoice::$precedingInvoiceReference`
+  constructor argument, carrying EN 16931 group **BG-3**: the number of the referenced invoice
+  (BT-25) and, optionally, its issue date (BT-26). The canonical model previously had no way to
+  express which invoice a credit note corrects, so the information could not reach a document at
+  all — and a credit note that names no preceding invoice is rejected by the profiles that require
+  the group, at transmission rather than at build time.
+- `UblGenerator` emits it as `cac:BillingReference/cac:InvoiceDocumentReference`, sequenced between
+  `cac:OrderReference` and `cac:AccountingSupplierParty`.
+- `CiiGenerator` emits it as `ram:InvoiceReferencedDocument` under
+  `ram:ApplicableHeaderTradeSettlement`, sequenced **after**
+  `ram:SpecifiedTradeSettlementHeaderMonetarySummation` as `HeaderTradeSettlementType` requires.
+- `InvoiceValidator` refuses a reference whose number is blank rather than emitting an empty
+  `cbc:ID` / `ram:IssuerAssignedID`.
+
+The argument is appended after `$metadata`, so no existing positional or named call changes. The
+group is emitted only when it is set: documents built by 2.0.x code are byte-identical.
+
+Neither generator keys the group on the document type. EN 16931 makes BG-3 conditional (0..n) and
+valid on a `380` invoice, where it references the partial or pre-payment invoices a final invoice
+completes; a credit note is not required by the standard itself to carry it. Requiring it for
+`typeCode` `381` would refuse documents the standard accepts and would break every consumer already
+producing credit notes without it — it is therefore not enforced here, and remains a candidate for
+a future major.
+
 ## [2.0.0] - 2026-09-01
 
 This release removes the paths where a misconfiguration, or a partner response the driver could
