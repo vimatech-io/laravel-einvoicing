@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Vimatech\EInvoicing\Dtos\CanonicalInvoice;
+use Vimatech\EInvoicing\Dtos\PrecedingInvoiceReference;
 use Vimatech\EInvoicing\Enums\Format;
 use Vimatech\EInvoicing\Formats\UblGenerator;
 use Vimatech\EInvoicing\Tests\Support\InvoiceFactory;
@@ -100,4 +101,80 @@ it('escapes special characters in text nodes', function () {
 
     $dom = new DOMDocument;
     expect($dom->loadXML($xml))->toBeTrue();
+});
+
+it('emits the preceding invoice reference on a credit note', function () {
+    $xml = (new UblGenerator)->generate(InvoiceFactory::creditNoteCorrecting())->contents;
+
+    $dom = new DOMDocument;
+    $dom->loadXML($xml);
+    $xpath = new DOMXPath($dom);
+    ublNamespaces($xpath);
+
+    $reference = '/cn:CreditNote/cac:BillingReference/cac:InvoiceDocumentReference/';
+
+    expect($xpath->evaluate("string({$reference}cbc:ID)"))->toBe('INV-2024-0001')
+        ->and($xpath->evaluate("string({$reference}cbc:IssueDate)"))->toBe('2024-01-15');
+});
+
+it('emits the preceding invoice reference on a 380 invoice as well', function () {
+    $base = InvoiceFactory::standardInvoice();
+    $invoice = new CanonicalInvoice(
+        number: $base->number,
+        issueDate: $base->issueDate,
+        currency: $base->currency,
+        seller: $base->seller,
+        buyer: $base->buyer,
+        lines: $base->lines,
+        taxBreakdowns: $base->taxBreakdowns,
+        buyerReference: $base->buyerReference,
+        orderReference: $base->orderReference,
+        precedingInvoiceReference: new PrecedingInvoiceReference('PREPAY-7'),
+    );
+
+    $xml = (new UblGenerator)->generate($invoice)->contents;
+
+    $dom = new DOMDocument;
+    $dom->loadXML($xml);
+    $xpath = new DOMXPath($dom);
+    ublNamespaces($xpath);
+
+    $reference = '/ubl:Invoice/cac:BillingReference/cac:InvoiceDocumentReference/';
+
+    expect($xpath->evaluate("string({$reference}cbc:ID)"))->toBe('PREPAY-7')
+        ->and($xpath->evaluate("count({$reference}cbc:IssueDate)"))->toBe(0.0);
+});
+
+it('sequences BillingReference after OrderReference and before the supplier party', function () {
+    $base = InvoiceFactory::standardInvoice();
+    $invoice = new CanonicalInvoice(
+        number: $base->number,
+        issueDate: $base->issueDate,
+        currency: $base->currency,
+        seller: $base->seller,
+        buyer: $base->buyer,
+        lines: $base->lines,
+        taxBreakdowns: $base->taxBreakdowns,
+        buyerReference: $base->buyerReference,
+        orderReference: $base->orderReference,
+        precedingInvoiceReference: new PrecedingInvoiceReference('INV-1'),
+    );
+
+    $xml = (new UblGenerator)->generate($invoice)->contents;
+
+    $dom = new DOMDocument;
+    $dom->loadXML($xml);
+    $xpath = new DOMXPath($dom);
+    ublNamespaces($xpath);
+
+    $billingReference = '/ubl:Invoice/cac:BillingReference';
+
+    expect($xpath->evaluate("count({$billingReference}/preceding-sibling::cac:OrderReference)"))->toBe(1.0)
+        ->and($xpath->evaluate("count({$billingReference}/following-sibling::cac:AccountingSupplierParty)"))->toBe(1.0);
+});
+
+it('omits BillingReference when no preceding invoice is referenced', function () {
+    $xml = (new UblGenerator)->generate(InvoiceFactory::creditNote())->contents;
+
+    expect($xml)->not->toContain('BillingReference');
 });

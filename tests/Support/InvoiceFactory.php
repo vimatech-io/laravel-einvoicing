@@ -8,6 +8,7 @@ use DateTimeImmutable;
 use Vimatech\EInvoicing\Dtos\CanonicalInvoice;
 use Vimatech\EInvoicing\Dtos\LineItem;
 use Vimatech\EInvoicing\Dtos\Party;
+use Vimatech\EInvoicing\Dtos\PrecedingInvoiceReference;
 use Vimatech\EInvoicing\Dtos\TaxBreakdown;
 
 /**
@@ -132,6 +133,28 @@ final class InvoiceFactory
             typeCode: CanonicalInvoice::TYPE_CREDIT_NOTE,
             buyerReference: 'PO-98765',
             note: 'Credit for returned item.',
+        );
+    }
+
+    public static function creditNoteCorrecting(): CanonicalInvoice
+    {
+        $creditNote = self::creditNote();
+
+        return new CanonicalInvoice(
+            number: $creditNote->number,
+            issueDate: $creditNote->issueDate,
+            currency: $creditNote->currency,
+            seller: $creditNote->seller,
+            buyer: $creditNote->buyer,
+            lines: $creditNote->lines,
+            taxBreakdowns: $creditNote->taxBreakdowns,
+            typeCode: $creditNote->typeCode,
+            buyerReference: $creditNote->buyerReference,
+            note: $creditNote->note,
+            precedingInvoiceReference: new PrecedingInvoiceReference(
+                number: 'INV-2024-0001',
+                issueDate: new DateTimeImmutable('2024-01-15'),
+            ),
         );
     }
 }
