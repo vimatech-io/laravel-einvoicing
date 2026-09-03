@@ -224,6 +224,26 @@ final class CiiGenerator implements FormatGenerator
         }
 
         $this->appendSummation($b, $settlement, $invoice);
+        $this->appendPrecedingInvoice($b, $settlement, $invoice);
+    }
+
+    // HeaderTradeSettlementType sequences ram:InvoiceReferencedDocument *after* the monetary
+    // summation, unlike every other reference in the document.
+    private function appendPrecedingInvoice(DomBuilder $b, DOMElement $settlement, CanonicalInvoice $invoice): void
+    {
+        $preceding = $invoice->precedingInvoiceReference;
+
+        if ($preceding === null) {
+            return;
+        }
+
+        $referenced = $b->child($settlement, 'ram:InvoiceReferencedDocument');
+        $b->child($referenced, 'ram:IssuerAssignedID', $preceding->number);
+
+        if ($preceding->issueDate !== null) {
+            $issue = $b->child($referenced, 'ram:FormattedIssueDateTime');
+            $b->child($issue, 'qdt:DateTimeString', $preceding->issueDate->format('Ymd'), ['format' => '102']);
+        }
     }
 
     private function appendHeaderTax(DomBuilder $b, DOMElement $settlement, TaxBreakdown $breakdown, string $currency): void

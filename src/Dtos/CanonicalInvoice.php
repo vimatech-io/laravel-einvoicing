@@ -38,6 +38,7 @@ final readonly class CanonicalInvoice
      * @param  string|null  $paymentReference  Remittance information (BT-83).
      * @param  float  $prepaidAmount  Sum already paid (BT-113).
      * @param  array<string, mixed>  $metadata  Free-form data for routing/tenancy; never serialised into documents.
+     * @param  PrecedingInvoiceReference|null  $precedingInvoiceReference  The invoice this document corrects or completes (BG-3).
      */
     public function __construct(
         public string $number,
@@ -58,6 +59,7 @@ final readonly class CanonicalInvoice
         public ?string $paymentReference = null,
         public float $prepaidAmount = 0.0,
         public array $metadata = [],
+        public ?PrecedingInvoiceReference $precedingInvoiceReference = null,
     ) {}
 
     public function isCreditNote(): bool
