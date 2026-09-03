@@ -113,6 +113,18 @@ final class UblGenerator implements FormatGenerator
             $orderReference = $b->child($root, 'cac:OrderReference');
             $b->child($orderReference, 'cbc:ID', $invoice->orderReference);
         }
+
+        $preceding = $invoice->precedingInvoiceReference;
+
+        if ($preceding !== null) {
+            $billingReference = $b->child($root, 'cac:BillingReference');
+            $documentReference = $b->child($billingReference, 'cac:InvoiceDocumentReference');
+            $b->child($documentReference, 'cbc:ID', $preceding->number);
+
+            if ($preceding->issueDate !== null) {
+                $b->child($documentReference, 'cbc:IssueDate', $preceding->issueDate->format('Y-m-d'));
+            }
+        }
     }
 
     private function appendParty(DomBuilder $b, DOMElement $root, string $wrapper, Party $party): void

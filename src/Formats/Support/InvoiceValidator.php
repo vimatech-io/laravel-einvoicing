@@ -65,6 +65,10 @@ final class InvoiceValidator
             $violations[] = 'BR-AB: either a buyer reference (BT-10) or an order reference (BT-13) is required';
         }
 
+        if ($invoice->precedingInvoiceReference !== null && trim($invoice->precedingInvoiceReference->number) === '') {
+            $violations[] = 'BR-55 (BT-25): a preceding invoice reference must carry the number of the referenced invoice';
+        }
+
         $this->validateParty($violations, 'Seller', $invoice->seller, requireElectronicAddress: $requireElectronicAddress);
         $this->validateParty($violations, 'Buyer', $invoice->buyer, requireElectronicAddress: $requireElectronicAddress);
 

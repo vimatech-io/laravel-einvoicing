@@ -118,6 +118,27 @@ A **credit note** is the same call with `typeCode: CanonicalInvoice::TYPE_CREDIT
 generator switches to the `CreditNote` root and `CreditedQuantity` automatically. Generate **CII**
 with `Format::Cii`.
 
+Name the invoice a credit note corrects with `precedingInvoiceReference` (EN 16931 group BG-3):
+
+```php
+use Vimatech\EInvoicing\Dtos\PrecedingInvoiceReference;
+
+$creditNote = new CanonicalInvoice(
+    // ...
+    typeCode: CanonicalInvoice::TYPE_CREDIT_NOTE,
+    precedingInvoiceReference: new PrecedingInvoiceReference(
+        number: 'INV-2024-0001',                       // BT-25
+        issueDate: new DateTimeImmutable('2024-01-15'), // BT-26, optional
+    ),
+);
+```
+
+It becomes `cac:BillingReference/cac:InvoiceDocumentReference` in UBL and
+`ram:InvoiceReferencedDocument` in CII. EN 16931 leaves the group optional, so the package does not
+require it — but a credit note that names no preceding invoice is rejected by the profiles that do,
+including the French PDP rules. The same field is valid on a `380` invoice, where it points at the
+partial or pre-payment invoices a final invoice completes.
+
 If a mandatory field is missing or the arithmetic does not balance, generation throws
 `InvalidInvoice`, which carries the full list of violations:
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Vimatech\EInvoicing\Dtos\CanonicalInvoice;
 use Vimatech\EInvoicing\Dtos\LineItem;
 use Vimatech\EInvoicing\Dtos\Party;
+use Vimatech\EInvoicing\Dtos\PrecedingInvoiceReference;
 use Vimatech\EInvoicing\Dtos\TaxBreakdown;
 use Vimatech\EInvoicing\Exceptions\InvalidInvoice;
 use Vimatech\EInvoicing\Formats\Support\InvoiceValidator;
@@ -25,6 +26,7 @@ function invoiceWith(array $overrides): CanonicalInvoice
         taxBreakdowns: $overrides['taxBreakdowns'] ?? $base->taxBreakdowns,
         buyerReference: array_key_exists('buyerReference', $overrides) ? $overrides['buyerReference'] : $base->buyerReference,
         orderReference: array_key_exists('orderReference', $overrides) ? $overrides['orderReference'] : null,
+        precedingInvoiceReference: $overrides['precedingInvoiceReference'] ?? null,
     );
 }
 
@@ -119,3 +121,20 @@ it('exposes violations on the exception', function () {
         expect($e->violations())->not->toBeEmpty();
     }
 });
+
+it('rejects a preceding invoice reference with a blank number', function () {
+    $invoice = invoiceWith(['precedingInvoiceReference' => new PrecedingInvoiceReference(' ')]);
+
+    expect((new InvoiceValidator)->collect($invoice))
+        ->toContain('BR-55 (BT-25): a preceding invoice reference must carry the number of the referenced invoice');
+});
+
+it('accepts a preceding invoice reference without an issue date', function () {
+    InvoiceValidator::assert(invoiceWith([
+        'precedingInvoiceReference' => new PrecedingInvoiceReference('INV-2024-0001'),
+    ]));
+})->throwsNoExceptions();
+
+it('does not require a preceding invoice reference on a credit note', function () {
+    InvoiceValidator::assert(InvoiceFactory::creditNote());
+})->throwsNoExceptions();
