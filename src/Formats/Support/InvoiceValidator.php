@@ -8,14 +8,16 @@ use Vimatech\EInvoicing\Dtos\CanonicalInvoice;
 use Vimatech\EInvoicing\Dtos\LineItem;
 use Vimatech\EInvoicing\Dtos\Party;
 use Vimatech\EInvoicing\Dtos\TaxBreakdown;
+use Vimatech\EInvoicing\Enums\ValidationProfile;
 use Vimatech\EInvoicing\Exceptions\InvalidInvoice;
 
 /**
- * Native EN 16931 mandatory-field and arithmetic validation.
+ * Native mandatory-field and arithmetic validation for the EN 16931 core, plus
+ * the additional rules of the selected profile.
  *
- * This implements the subset of the standard the package emits; it is not a
- * full Schematron engine. It exists to fail fast with actionable messages
- * before a document is ever rendered or transmitted.
+ * This implements the subset of the rules the package emits; it is not a full
+ * Schematron engine. It exists to fail fast with actionable messages before a
+ * document is ever rendered or transmitted.
  */
 final class InvoiceValidator
 {
@@ -33,9 +35,11 @@ final class InvoiceValidator
     /**
      * @throws InvalidInvoice
      */
-    public static function assert(CanonicalInvoice $invoice, bool $requireElectronicAddress = false): void
-    {
-        $violations = (new self)->collect($invoice, $requireElectronicAddress);
+    public static function assertConformsTo(
+        CanonicalInvoice $invoice,
+        ValidationProfile $profile = ValidationProfile::En16931,
+    ): void {
+        $violations = (new self)->violations($invoice, $profile);
 
         if ($violations !== []) {
             throw InvalidInvoice::withViolations($violations);
@@ -43,10 +47,39 @@ final class InvoiceValidator
     }
 
     /**
+     * @deprecated 2.2.0 Use assertConformsTo() with a ValidationProfile. Removed in 3.0.0.
+     *
+     * @throws InvalidInvoice
+     */
+    public static function assert(CanonicalInvoice $invoice, bool $requireElectronicAddress = false): void
+    {
+        self::assertConformsTo($invoice, self::profileFor($requireElectronicAddress));
+    }
+
+    /**
+     * @deprecated 2.2.0 Use violations() with a ValidationProfile. Removed in 3.0.0.
+     *
      * @return list<string>
      */
     public function collect(CanonicalInvoice $invoice, bool $requireElectronicAddress = false): array
     {
+        return $this->violations($invoice, self::profileFor($requireElectronicAddress));
+    }
+
+    private static function profileFor(bool $requireElectronicAddress): ValidationProfile
+    {
+        return $requireElectronicAddress
+            ? ValidationProfile::PeppolBis
+            : ValidationProfile::En16931;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function violations(
+        CanonicalInvoice $invoice,
+        ValidationProfile $profile = ValidationProfile::En16931,
+    ): array {
         $violations = [];
 
         if (trim($invoice->number) === '') {
@@ -61,16 +94,18 @@ final class InvoiceValidator
             $violations[] = 'BT-3: unsupported document type code '.$invoice->typeCode;
         }
 
-        if ($invoice->buyerReference === null && $invoice->orderReference === null) {
-            $violations[] = 'BR-AB: either a buyer reference (BT-10) or an order reference (BT-13) is required';
+        if ($profile === ValidationProfile::PeppolBis
+            && $invoice->buyerReference === null
+            && $invoice->orderReference === null) {
+            $violations[] = 'PEPPOL-EN16931-R003: a buyer reference (BT-10) or a purchase order reference (BT-13) must be provided for Peppol BIS Billing 3.0';
         }
 
         if ($invoice->precedingInvoiceReference !== null && trim($invoice->precedingInvoiceReference->number) === '') {
             $violations[] = 'BR-55 (BT-25): a preceding invoice reference must carry the number of the referenced invoice';
         }
 
-        $this->validateParty($violations, 'Seller', $invoice->seller, requireElectronicAddress: $requireElectronicAddress);
-        $this->validateParty($violations, 'Buyer', $invoice->buyer, requireElectronicAddress: $requireElectronicAddress);
+        $this->validateParty($violations, 'Seller', $invoice->seller, $profile);
+        $this->validateParty($violations, 'Buyer', $invoice->buyer, $profile);
 
         if ($invoice->lines === []) {
             $violations[] = 'BG-25: at least one invoice line is required';
@@ -96,7 +131,7 @@ final class InvoiceValidator
     /**
      * @param  list<string>  $violations
      */
-    private function validateParty(array &$violations, string $role, Party $party, bool $requireElectronicAddress): void
+    private function validateParty(array &$violations, string $role, Party $party, ValidationProfile $profile): void
     {
         if (trim($party->name) === '') {
             $violations[] = "{$role}: name is required";
@@ -106,8 +141,8 @@ final class InvoiceValidator
             $violations[] = "{$role}: a 2-letter ISO 3166-1 country code is required";
         }
 
-        if ($requireElectronicAddress && ! $party->hasElectronicAddress()) {
-            $violations[] = "{$role}: an electronic address (endpoint id + scheme) is required for this network";
+        if ($profile === ValidationProfile::PeppolBis && ! $party->hasElectronicAddress()) {
+            $violations[] = "{$role}: an electronic address (endpoint id + scheme) is required for Peppol BIS Billing 3.0";
         }
     }
 
