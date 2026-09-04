@@ -19,9 +19,10 @@ networks (Peppol access points, French PDPs), with per-country routing — for L
 - **Pluggable networks** — `PeppolDriver`, `FrPdpDriver`, `NullDriver`, `FakeDriver`, plus your own.
 - **Per-country routing** — map destination countries to networks, with a fallback and a
   per-tenant override hook.
-- **Native validation** — mandatory-field and arithmetic checks (EN 16931 subset) fail fast with
-  actionable messages before anything is rendered or transmitted. Arithmetic checks allow a fixed
-  0.02 tolerance to absorb per-line rounding.
+- **Profile-scoped validation** — mandatory-field and arithmetic checks fail fast with actionable
+  messages before anything is rendered or transmitted. The EN 16931 core applies to every document;
+  the extra rules of a CIUS apply only when that profile is the one being emitted. Arithmetic checks
+  allow a fixed 0.02 tolerance to absorb per-line rounding.
 - **Lifecycle events** — `EInvoiceGenerated`, `EInvoiceDispatched`, `EInvoiceDelivered`,
   `EInvoiceRejected`, `EInvoiceReceived`.
 
@@ -151,6 +152,29 @@ try {
     $e->violations(); // ['BT-1: invoice number is required', ...]
 }
 ```
+
+Which rules run depends on what is being emitted. `Format::Cii` carries the plain EN 16931 guideline
+identifier and is validated against the core alone; `Format::Ubl` carries the Peppol BIS Billing 3.0
+customization identifier and additionally enforces the Peppol rules — electronic addresses for both
+parties, and `PEPPOL-EN16931-R003`, which requires a buyer reference (BT-10) or a purchase order
+reference (BT-13). Both terms are optional in the core standard, so neither is required of a CII
+document.
+
+Validate against a profile without generating anything:
+
+```php
+use Vimatech\EInvoicing\Enums\ValidationProfile;
+use Vimatech\EInvoicing\Formats\Support\InvoiceValidator;
+
+InvoiceValidator::assertConformsTo($invoice, ValidationProfile::PeppolBis);
+
+(new InvoiceValidator)->violations($invoice); // EN 16931 core, as a list
+```
+
+Reach for `ValidationProfile::PeppolBis` on a CII document when you transmit it through Peppol, or
+to a CIUS that carries the same requirement — XRechnung enforces the buyer reference through
+`BR-DE-15`, and Chorus Pro requires a service code or an engagement number for the public entities
+whose directory entry demands one.
 
 ### 3. Send through a network
 
