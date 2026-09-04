@@ -7,6 +7,48 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.2.0] - unreleased
+
+### Fixed
+
+- The validator refused every invoice that carried neither a buyer reference (BT-10) nor a purchase
+  order reference (BT-13), reporting it as `BR-AB`. **No rule with that identifier exists.** In the
+  EN 16931 semantic model both terms are `0..1`, and none of the core rules published in the CEN
+  validation artefacts references either one. The requirement is `PEPPOL-EN16931-R003` — "A buyer
+  reference or purchase order reference MUST be provided" — which belongs to Peppol BIS Billing 3.0,
+  not to the standard it profiles.
+
+  Enforcing it on every document rejected invoices that EN 16931 accepts, including the ordinary
+  business-to-business invoice of a seller who has no purchase order to quote. The practical
+  consequence was worse than the rejection: the only way past it was to put an invented reference on
+  a fiscal document. CII output was affected too, although it carries the plain EN 16931 guideline
+  identifier and no Peppol rule governs it.
+
+### Added
+
+- `ValidationProfile` enum selecting the rule set a `CanonicalInvoice` is validated against:
+  `En16931` for the semantic core, `PeppolBis` for the core plus the Peppol BIS Billing 3.0
+  additions. `UblGenerator` selects `PeppolBis`, `CiiGenerator` selects `En16931`.
+- `InvoiceValidator::assertConformsTo()` and `InvoiceValidator::violations()`, both taking a
+  `ValidationProfile` and defaulting to `En16931`.
+
+### Deprecated
+
+- `InvoiceValidator::assert()` and `InvoiceValidator::collect()`, and their
+  `$requireElectronicAddress` argument. That argument only ever meant "validate for Peppol", so
+  `true` now selects `ValidationProfile::PeppolBis` and behaviour is unchanged for every existing
+  caller. Both are removed in 3.0.0; pass a `ValidationProfile` instead.
+
+### Upgrading from 2.1.x
+
+1. Nothing is required. Every document that generated before still generates, byte for byte.
+2. Invoices previously refused for a missing buyer or purchase order reference now generate as CII
+   and as plain EN 16931. If you relied on that refusal — because you transmit through Peppol, or to
+   a CIUS that carries the requirement, such as XRechnung via `BR-DE-15` — validate explicitly with
+   `InvoiceValidator::assertConformsTo($invoice, ValidationProfile::PeppolBis)`.
+3. The requirement remains enforced, unchanged, for every UBL document: `UblGenerator` emits Peppol
+   BIS Billing 3.0 and validates against it.
+
 ## [2.1.0] - 2026-09-04
 
 ### Added

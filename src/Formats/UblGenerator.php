@@ -12,6 +12,7 @@ use Vimatech\EInvoicing\Dtos\LineItem;
 use Vimatech\EInvoicing\Dtos\Party;
 use Vimatech\EInvoicing\Dtos\TaxBreakdown;
 use Vimatech\EInvoicing\Enums\Format;
+use Vimatech\EInvoicing\Enums\ValidationProfile;
 use Vimatech\EInvoicing\Formats\Support\Decimal;
 use Vimatech\EInvoicing\Formats\Support\DomBuilder;
 use Vimatech\EInvoicing\Formats\Support\InvoiceValidator;
@@ -47,7 +48,7 @@ final class UblGenerator implements FormatGenerator
 
     public function generate(CanonicalInvoice $invoice): GeneratedDocument
     {
-        InvoiceValidator::assert($invoice, requireElectronicAddress: true);
+        InvoiceValidator::assertConformsTo($invoice, ValidationProfile::PeppolBis);
 
         $isCreditNote = $invoice->isCreditNote();
 

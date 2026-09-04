@@ -44,7 +44,7 @@ final class CiiGenerator implements FormatGenerator
 
     public function generate(CanonicalInvoice $invoice): GeneratedDocument
     {
-        InvoiceValidator::assert($invoice);
+        InvoiceValidator::assertConformsTo($invoice);
 
         $builder = new DomBuilder('rsm:CrossIndustryInvoice', self::RSM, [
             'rsm' => self::RSM,

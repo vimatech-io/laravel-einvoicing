@@ -7,7 +7,9 @@ use Vimatech\EInvoicing\Dtos\LineItem;
 use Vimatech\EInvoicing\Dtos\Party;
 use Vimatech\EInvoicing\Dtos\PrecedingInvoiceReference;
 use Vimatech\EInvoicing\Dtos\TaxBreakdown;
+use Vimatech\EInvoicing\Enums\ValidationProfile;
 use Vimatech\EInvoicing\Exceptions\InvalidInvoice;
+use Vimatech\EInvoicing\Formats\CiiGenerator;
 use Vimatech\EInvoicing\Formats\Support\InvoiceValidator;
 use Vimatech\EInvoicing\Formats\UblGenerator;
 use Vimatech\EInvoicing\Tests\Support\InvoiceFactory;
@@ -47,17 +49,43 @@ it('collects every violation rather than failing on the first', function () {
         'orderReference' => null,
     ]);
 
-    $violations = (new InvoiceValidator)->collect($invoice);
+    $violations = (new InvoiceValidator)->violations($invoice);
 
-    expect($violations)->toHaveCount(3)
+    expect($violations)->toHaveCount(2)
         ->and(implode(' ', $violations))->toContain('BT-1')
-        ->and(implode(' ', $violations))->toContain('BT-5')
-        ->and(implode(' ', $violations))->toContain('BR-AB');
+        ->and(implode(' ', $violations))->toContain('BT-5');
 });
 
-it('requires either a buyer reference or an order reference', function () {
-    expect(fn () => InvoiceValidator::assert(invoiceWith(['buyerReference' => null, 'orderReference' => null])))
-        ->toThrow(InvalidInvoice::class, 'BR-AB');
+it('accepts an invoice carrying neither a buyer nor a purchase order reference', function () {
+    $invoice = invoiceWith(['buyerReference' => null, 'orderReference' => null]);
+
+    InvoiceValidator::assertConformsTo($invoice);
+
+    expect((new CiiGenerator)->generate($invoice)->contents)->not->toContain('BuyerReference');
+});
+
+it('requires a buyer or purchase order reference under Peppol BIS only', function () {
+    $invoice = invoiceWith(['buyerReference' => null, 'orderReference' => null]);
+
+    expect(fn () => InvoiceValidator::assertConformsTo($invoice, ValidationProfile::PeppolBis))
+        ->toThrow(InvalidInvoice::class, 'PEPPOL-EN16931-R003')
+        ->and(fn () => (new UblGenerator)->generate($invoice))
+        ->toThrow(InvalidInvoice::class, 'PEPPOL-EN16931-R003');
+});
+
+it('accepts a purchase order reference alone under Peppol BIS', function () {
+    InvoiceValidator::assertConformsTo(
+        invoiceWith(['buyerReference' => null, 'orderReference' => 'PO-1']),
+        ValidationProfile::PeppolBis,
+    );
+})->throwsNoExceptions();
+
+it('keeps the deprecated boolean selecting the Peppol BIS profile', function () {
+    $invoice = invoiceWith(['buyerReference' => null, 'orderReference' => null]);
+
+    expect((new InvoiceValidator)->collect($invoice))->toBeEmpty()
+        ->and(implode(' ', (new InvoiceValidator)->collect($invoice, requireElectronicAddress: true)))
+        ->toContain('PEPPOL-EN16931-R003');
 });
 
 it('requires a seller VAT id for standard-rated VAT', function () {
