@@ -1,7 +1,9 @@
 # Laravel E-Invoicing
 
 [![CI](https://github.com/vimatech-io/laravel-einvoicing/actions/workflows/ci.yml/badge.svg)](https://github.com/vimatech-io/laravel-einvoicing/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/vimatech/laravel-einvoicing.svg)](https://packagist.org/packages/vimatech/laravel-einvoicing)
+[![Total Downloads](https://img.shields.io/packagist/dt/vimatech/laravel-einvoicing.svg)](https://packagist.org/packages/vimatech/laravel-einvoicing)
+[![License](https://img.shields.io/packagist/l/vimatech/laravel-einvoicing.svg)](https://packagist.org/packages/vimatech/laravel-einvoicing)
 
 Generate compliant structured e-invoices **natively** and dispatch them through pluggable
 networks (Peppol access points, French PDPs), with per-country routing — for Laravel 11, 12 and 13.
