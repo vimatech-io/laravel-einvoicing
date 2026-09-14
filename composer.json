@@ -1,6 +1,6 @@
 {
     "name": "vimatech/laravel-einvoicing",
-    "description": "Generate compliant structured e-invoices (Peppol BIS 3.0 UBL, EN 16931 CII) natively and dispatch them through pluggable networks. Zero third-party runtime dependencies.",
+    "description": "Native Peppol BIS 3.0 (UBL) and EN 16931 (CII) e-invoice generation and dispatch for Laravel. Zero third-party runtime dependencies.",
     "keywords": [
         "laravel",
         "einvoicing",
