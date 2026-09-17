@@ -1,12 +1,19 @@
-# Laravel E-Invoicing
+<a href="https://vimatech.io/open-source">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://vimatech.io/packages/header/laravel-einvoicing/dark.webp">
+    <img alt="Laravel E-Invoicing" src="https://vimatech.io/packages/header/laravel-einvoicing/light.webp">
+  </picture>
+</a>
+
+# Structured e-invoices for Laravel, generated natively
 
 [![CI](https://github.com/vimatech-io/laravel-einvoicing/actions/workflows/ci.yml/badge.svg)](https://github.com/vimatech-io/laravel-einvoicing/actions/workflows/ci.yml)
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/vimatech/laravel-einvoicing.svg)](https://packagist.org/packages/vimatech/laravel-einvoicing)
 [![Total Downloads](https://img.shields.io/packagist/dt/vimatech/laravel-einvoicing.svg)](https://packagist.org/packages/vimatech/laravel-einvoicing)
 [![License](https://img.shields.io/packagist/l/vimatech/laravel-einvoicing.svg)](https://packagist.org/packages/vimatech/laravel-einvoicing)
 
-Generate compliant structured e-invoices **natively** and dispatch them through pluggable
-networks (Peppol access points, French PDPs), with per-country routing — for Laravel 11, 12 and 13.
+Generate compliant structured e-invoices **natively** for Laravel 11, 12 and 13, and dispatch
+them through pluggable networks (Peppol access points, French PDPs), with per-country routing.
 
 > **Zero third-party runtime dependencies.** Every document is built with PHP's own `ext-dom`;
 > every network call uses Laravel's own HTTP client. No `horstoeko/zugferd`, no UBL libraries,
@@ -14,18 +21,18 @@ networks (Peppol access points, French PDPs), with per-country routing — for L
 
 ## Features
 
-- **Native generators** — Peppol BIS Billing 3.0 (UBL invoice + credit note) and EN 16931 CII,
+- **Native generators**: Peppol BIS Billing 3.0 (UBL invoice + credit note) and EN 16931 CII,
   emitted directly with `DOMDocument`. Factur-X (PDF/A-3) is stubbed for a later isolated module.
-- **Neutral domain model** — a single `CanonicalInvoice` DTO; no format or vendor concept ever
+- **Neutral domain model**: a single `CanonicalInvoice` DTO; no format or vendor concept ever
   leaks into your application.
-- **Pluggable networks** — `PeppolDriver`, `FrPdpDriver`, `NullDriver`, `FakeDriver`, plus your own.
-- **Per-country routing** — map destination countries to networks, with a fallback and a
+- **Pluggable networks**: `PeppolDriver`, `FrPdpDriver`, `NullDriver`, `FakeDriver`, plus your own.
+- **Per-country routing**: map destination countries to networks, with a fallback and a
   per-tenant override hook.
-- **Profile-scoped validation** — mandatory-field and arithmetic checks fail fast with actionable
+- **Profile-scoped validation**: mandatory-field and arithmetic checks fail fast with actionable
   messages before anything is rendered or transmitted. The EN 16931 core applies to every document;
   the extra rules of a CIUS apply only when that profile is the one being emitted. Arithmetic checks
   allow a fixed 0.02 tolerance to absorb per-line rounding.
-- **Lifecycle events** — `EInvoiceGenerated`, `EInvoiceDispatched`, `EInvoiceDelivered`,
+- **Lifecycle events**: `EInvoiceGenerated`, `EInvoiceDispatched`, `EInvoiceDelivered`,
   `EInvoiceRejected`, `EInvoiceReceived`.
 
 ## Requirements
@@ -101,7 +108,7 @@ $invoice = new CanonicalInvoice(
 ```
 
 > Document totals (line extension, tax exclusive/inclusive, payable) are derived from the lines
-> and the VAT breakdown — you do not pass them in.
+> and the VAT breakdown: you do not pass them in.
 
 ### 2. Generate a UBL (Peppol BIS 3.0) document
 
@@ -117,7 +124,7 @@ $document->profile;         // urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.
 $document->save('/path/to/INV-2024-0001.xml');
 ```
 
-A **credit note** is the same call with `typeCode: CanonicalInvoice::TYPE_CREDIT_NOTE` — the
+A **credit note** is the same call with `typeCode: CanonicalInvoice::TYPE_CREDIT_NOTE`: the
 generator switches to the `CreditNote` root and `CreditedQuantity` automatically. Generate **CII**
 with `Format::Cii`.
 
@@ -138,7 +145,7 @@ $creditNote = new CanonicalInvoice(
 
 It becomes `cac:BillingReference/cac:InvoiceDocumentReference` in UBL and
 `ram:InvoiceReferencedDocument` in CII. EN 16931 leaves the group optional, so the package does not
-require it — but a credit note that names no preceding invoice is rejected by the profiles that do,
+require it, but a credit note that names no preceding invoice is rejected by the profiles that do,
 including the French PDP rules. The same field is valid on a `380` invoice, where it points at the
 partial or pre-payment invoices a final invoice completes.
 
@@ -157,7 +164,7 @@ try {
 
 Which rules run depends on what is being emitted. `Format::Cii` carries the plain EN 16931 guideline
 identifier and is validated against the core alone; `Format::Ubl` carries the Peppol BIS Billing 3.0
-customization identifier and additionally enforces the Peppol rules — electronic addresses for both
+customization identifier and additionally enforces the Peppol rules: electronic addresses for both
 parties, and `PEPPOL-EN16931-R003`, which requires a buyer reference (BT-10) or a purchase order
 reference (BT-13). Both terms are optional in the core standard, so neither is required of a CII
 document.
@@ -174,7 +181,7 @@ InvoiceValidator::assertConformsTo($invoice, ValidationProfile::PeppolBis);
 ```
 
 Reach for `ValidationProfile::PeppolBis` on a CII document when you transmit it through Peppol, or
-to a CIUS that carries the same requirement — XRechnung enforces the buyer reference through
+to a CIUS that carries the same requirement: XRechnung enforces the buyer reference through
 `BR-DE-15`, and Chorus Pro requires a service code or an engagement number for the public entities
 whose directory entry demands one.
 
@@ -212,7 +219,7 @@ if ($result->messageId !== null) {
 
 `send()` always fires `EInvoiceDispatched`. `EInvoiceDelivered` fires only for `Delivered` and
 `Accepted`, `EInvoiceRejected` only for `Rejected` and `Failed`. A queued submission, a document
-still in transit, or a status your `status_map` does not cover fires neither — poll `fetchStatus()`
+still in transit, or a status your `status_map` does not cover fires neither: poll `fetchStatus()`
 rather than treating the absence of a delivery as a refusal.
 
 ### 4. Receive inbound documents
@@ -226,7 +233,7 @@ foreach (EInvoice::receive('peppol') as $inbound) {
 ```
 
 Bodies arrive base64-encoded. A body that is absent, that is not valid base64, or that decodes to
-nothing raises `NetworkException` naming the offending message id, and the whole batch stops — the
+nothing raises `NetworkException` naming the offending message id, and the whole batch stops: the
 package will not hand your application a document it could not decode. If your partner returns
 unencoded bodies, extend the driver and override `decodeInbound()`; do not make it accept both,
 since the two cannot be told apart and the wrong guess silently yields a corrupt invoice.
@@ -239,7 +246,7 @@ table, and the default format. Credentials come from the environment.
 HTTP drivers read `base_url`, `token`, `auth`, `timeout`, `headers`, `verify`, `paths` and
 `status_map`. A setting that is present but cannot be read as the type it needs raises
 `InvalidDriverConfig` rather than being ignored, and environment strings such as `"120"` and
-`"false"` are understood — a value you set is either applied or reported, never dropped.
+`"false"` are understood: a value you set is either applied or reported, never dropped.
 
 ```php
 'networks' => [
@@ -267,7 +274,7 @@ HTTP drivers read `base_url`, `token`, `auth`, `timeout`, `headers`, `verify`, `
 ### Adapting a built-in driver to your partner
 
 `PeppolDriver` and `FrPdpDriver` speak a small, neutral REST shape. Point them at your access
-point / PDP by overriding `paths` and, where the vocabulary differs, `status_map` — no code change:
+point / PDP by overriding `paths` and, where the vocabulary differs, `status_map`, no code change needed:
 
 ```php
 'peppol' => [
@@ -288,8 +295,8 @@ point / PDP by overriding `paths` and, where the vocabulary differs, `status_map
 ```
 
 A missing or empty `token` is refused: an unauthenticated request to an accredited platform is
-rejected without a reason you can act on. When your partner authenticates another way — mutual
-TLS, a signed header — declare it, and configure no token:
+rejected without a reason you can act on. When your partner authenticates another way (mutual
+TLS, a signed header), declare it, and configure no token:
 
 ```php
 'peppol' => [
@@ -331,8 +338,8 @@ EInvoice::router()->overrideUsing(function (string $country, ?CanonicalInvoice $
 
 ## Adding a driver
 
-Implement `EInvoiceNetwork` (or extend `AbstractHttpDriver` for a REST partner) — keep every vendor
-concept inside the driver:
+Implement `EInvoiceNetwork` (or extend `AbstractHttpDriver` for a REST partner), keeping every
+vendor concept inside the driver:
 
 ```php
 namespace App\EInvoicing;
@@ -387,7 +394,7 @@ app(\Vimatech\EInvoicing\Networks\NetworkManager::class)
 ## Testing with the FakeDriver
 
 A dependency-free `FakeDriver` is shipped for **your** test suite. Swap any network for it and
-assert against what was sent — no HTTP, no credentials:
+assert against what was sent, no HTTP, no credentials:
 
 ```php
 use Vimatech\EInvoicing\Facades\EInvoice;
@@ -415,7 +422,7 @@ it('handles a rejection', function () {
 
 ## Conformance & testing notes
 
-- **Profiles emitted**: Peppol BIS Billing 3.0 — `CustomizationID`
+- **Profiles emitted**: Peppol BIS Billing 3.0, `CustomizationID`
   `urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0`,
   `ProfileID` `urn:fdc:peppol.eu:2017:poacc:billing:01:1.0`. CII carries the EN 16931 guideline
   `urn:cen.eu:en16931:2017`.
@@ -447,11 +454,11 @@ CanonicalInvoice ──► FormatGenerator ──► GeneratedDocument
             (by country)       (Peppol / FrPdp / Null / Fake / yours)
 ```
 
-- `Dtos/` — readonly value objects (the neutral model).
-- `Formats/` — native `DOMDocument` generators + validation.
-- `Networks/` — drivers + the config-driven `NetworkManager`.
-- `Routing/` — `EInvoiceRouter` (country map + fallback + override hook).
-- `Events/`, `Exceptions/`, `Facades/` — the glue.
+- `Dtos/`: readonly value objects (the neutral model).
+- `Formats/`: native `DOMDocument` generators + validation.
+- `Networks/`: drivers + the config-driven `NetworkManager`.
+- `Routing/`: `EInvoiceRouter` (country map + fallback + override hook).
+- `Events/`, `Exceptions/`, `Facades/`: the glue.
 
 ## Contributing
 
