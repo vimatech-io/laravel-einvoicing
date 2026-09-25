@@ -74,8 +74,8 @@ final class UblGenerator implements FormatGenerator
             format: Format::Ubl,
             contents: $builder->toXml(),
             mimeType: Format::Ubl->mimeType(),
-            filename: $this->filename($invoice),
-            profile: self::CUSTOMIZATION_ID,
+            filename: Format::Ubl->filename($invoice->number),
+            profile: Format::Ubl->profile(),
             invoiceNumber: $invoice->number,
         );
     }
@@ -351,12 +351,5 @@ final class UblGenerator implements FormatGenerator
         if ($line->baseQuantity !== null) {
             $b->child($price, 'cbc:BaseQuantity', Decimal::quantity($line->baseQuantity), ['unitCode' => $line->unitCode]);
         }
-    }
-
-    private function filename(CanonicalInvoice $invoice): string
-    {
-        $safe = preg_replace('/[^A-Za-z0-9._-]/', '-', $invoice->number) ?? 'invoice';
-
-        return $safe.'.xml';
     }
 }

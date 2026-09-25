@@ -63,8 +63,8 @@ final class CiiGenerator implements FormatGenerator
             format: Format::Cii,
             contents: $builder->toXml(),
             mimeType: Format::Cii->mimeType(),
-            filename: $this->filename($invoice),
-            profile: self::GUIDELINE_ID,
+            filename: Format::Cii->filename($invoice->number),
+            profile: Format::Cii->profile(),
             invoiceNumber: $invoice->number,
         );
     }
@@ -279,12 +279,5 @@ final class CiiGenerator implements FormatGenerator
         }
 
         $b->child($summation, 'ram:DuePayableAmount', Decimal::amount($invoice->payableAmount()));
-    }
-
-    private function filename(CanonicalInvoice $invoice): string
-    {
-        $safe = preg_replace('/[^A-Za-z0-9._-]/', '-', $invoice->number) ?? 'invoice';
-
-        return $safe.'-cii.xml';
     }
 }
