@@ -7,6 +7,60 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- The item net price (BT-146) was rendered through the amount formatter and rounded to two decimals:
+  a line of 1000 items at 0.125 carried a price of `0.13` next to a line net amount (BT-131) of
+  `125.00`. EN 16931 does not limit the decimals of a price, only of amounts. `cbc:PriceAmount` and
+  `ram:ChargeAmount` now carry the price at its own precision: at least two decimals, trailing zeros
+  trimmed beyond that, up to six. A price with a seventh decimal is refused.
+- VAT rates (BT-119, BT-152) were rounded to two decimals: 9.975 % was emitted as `9.98`, so the VAT
+  amount (BT-117) no longer matched the rate the document displayed. Rates are now rendered with up
+  to four decimals, at least two, trailing zeros trimmed. A rate with a fifth decimal is refused
+  rather than rounded.
+- Amounts were rounded to two decimals without notice: an amount of 1.235 was emitted as `1.24`,
+  so the document stated a value the issuer never invoiced. An amount that two decimals cannot
+  represent (EN 16931 `BR-DEC`) is now refused with an `InvalidInvoice` naming the business term
+  and, for a line or a VAT breakdown, which one. Binary float noise is not mistaken for a third
+  decimal: `0.1 + 0.2` still renders as `0.30`.
+
+### Added
+
+- `CanonicalInvoice::$amountDecimals`, an optional last constructor argument defaulting to `2`: the
+  ISO 4217 minor unit of the document currency (BT-5) as the issuer fixed it, from 0 to 4. The
+  derived totals (BT-106, BT-110, BT-112, BT-115) are rounded at this scale, and the arithmetic
+  checks of `InvoiceValidator` (BT-131, `BR-CO-17`, `BR-CO-10`) round at it and allow two of its
+  smallest units as tolerance, which is the former fixed 0.02 at two decimals. It does not relax the
+  XML rule above: a JPY document renders `1000.00`, a TND document with a real third decimal is
+  refused.
+- `EInvoiceManager::transmit()` (and `EInvoice::transmit()`) transmits a `GeneratedDocument` already
+  rendered, routed with its `CanonicalInvoice`, firing the same events as `send()`. It refuses a
+  document whose invoice number differs from the invoice's. `send()` is now `generate()` followed by
+  `transmit()`, with unchanged behaviour.
+- `GeneratedDocument::fromStored()` rebuilds a document from stored contents, a `Format` and the
+  invoice number, with exactly the MIME type, profile and file name `generate()` sets. It refuses
+  contents that are not a UBL invoice or credit note, or a CII invoice, carrying that invoice number,
+  and throws `NotImplemented` for `Format::FacturX`.
+- `Format::profile()` and `Format::filename()`, now the single source of both values for the
+  generators and `fromStored()`.
+- `Decimal::unitPrice()`, and an optional business-term label on `Decimal::amount()` and
+  `Decimal::percent()` used in their error messages.
+- The namespace constants `UblGenerator::CBC`, `UblGenerator::INVOICE_NS`,
+  `UblGenerator::CREDIT_NOTE_NS`, `CiiGenerator::RSM` and `CiiGenerator::RAM` are public.
+
+### Upgrading from 2.2.x
+
+1. Documents whose amounts carry at most two decimals, rates at most two and prices at most two
+   generate byte for byte as before.
+2. Generation now throws `InvalidInvoice` for an amount with a third decimal, a rate with a fifth or
+   a price with a seventh, where it used to round. Round such values in your application, at the
+   point where the rounding is a business decision, before building the invoice.
+3. To transmit the file you stored at issuance rather than a document rendered again, replace
+   `EInvoice::send($invoice)` with
+   `EInvoice::transmit(GeneratedDocument::fromStored($format, $contents, $invoice->number), $invoice)`.
+4. For a currency whose minor unit is not 2, pass `amountDecimals` so the totals and the checks run
+   at its scale.
+
 ## [2.2.0] - 2026-09-04
 
 ### Fixed
