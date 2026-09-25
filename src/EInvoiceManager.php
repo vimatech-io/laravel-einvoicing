@@ -18,6 +18,7 @@ use Vimatech\EInvoicing\Events\EInvoiceDispatched;
 use Vimatech\EInvoicing\Events\EInvoiceGenerated;
 use Vimatech\EInvoicing\Events\EInvoiceReceived;
 use Vimatech\EInvoicing\Events\EInvoiceRejected;
+use Vimatech\EInvoicing\Exceptions\EInvoicingException;
 use Vimatech\EInvoicing\Formats\CiiGenerator;
 use Vimatech\EInvoicing\Formats\FacturXGenerator;
 use Vimatech\EInvoicing\Formats\UblGenerator;
@@ -81,17 +82,34 @@ final class EInvoiceManager
         return $this->networks;
     }
 
-    /**
-     * A status that is neither a delivery nor a refusal — a queued submission, a
-     * status the partner vocabulary does not cover — dispatches EInvoiceDispatched
-     * alone. Poll fetchStatus() for the outcome.
-     */
     public function send(
         CanonicalInvoice $invoice,
         ?Format $format = null,
         ?string $networkKey = null,
     ): DispatchResult {
-        $document = $this->generate($invoice, $format);
+        return $this->transmit($this->generate($invoice, $format), $invoice, $networkKey);
+    }
+
+    /**
+     * Transmit a document already rendered, such as the file stored when the
+     * invoice was issued. A status that is neither a delivery nor a refusal (a
+     * queued submission, or a status the partner vocabulary does not cover)
+     * dispatches EInvoiceDispatched alone: poll fetchStatus() for the outcome.
+     *
+     * @throws EInvoicingException when the document belongs to another invoice
+     */
+    public function transmit(
+        GeneratedDocument $document,
+        CanonicalInvoice $invoice,
+        ?string $networkKey = null,
+    ): DispatchResult {
+        if ($document->invoiceNumber !== $invoice->number) {
+            throw new EInvoicingException(sprintf(
+                'The document of invoice "%s" cannot be transmitted as invoice "%s".',
+                $document->invoiceNumber,
+                $invoice->number,
+            ));
+        }
 
         $network = $networkKey !== null
             ? $this->networks->network($networkKey)

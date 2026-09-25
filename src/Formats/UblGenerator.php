@@ -27,13 +27,13 @@ use Vimatech\EInvoicing\Formats\Support\InvoiceValidator;
  */
 final class UblGenerator implements FormatGenerator
 {
-    private const CBC = 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2';
+    public const CBC = 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2';
 
     private const CAC = 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2';
 
-    private const INVOICE_NS = 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2';
+    public const INVOICE_NS = 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2';
 
-    private const CREDIT_NOTE_NS = 'urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2';
+    public const CREDIT_NOTE_NS = 'urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2';
 
     public const CUSTOMIZATION_ID = 'urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0';
 

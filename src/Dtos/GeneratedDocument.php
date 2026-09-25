@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 namespace Vimatech\EInvoicing\Dtos;
 
+use DOMDocument;
+use DOMElement;
+use DOMXPath;
 use Vimatech\EInvoicing\Enums\Format;
 use Vimatech\EInvoicing\Exceptions\EInvoicingException;
+use Vimatech\EInvoicing\Exceptions\NotImplemented;
+use Vimatech\EInvoicing\Formats\CiiGenerator;
+use Vimatech\EInvoicing\Formats\UblGenerator;
 
 /**
  * An immutable, fully-rendered structured document ready to be transmitted or
@@ -29,6 +35,36 @@ final readonly class GeneratedDocument
         public string $profile,
         public string $invoiceNumber,
     ) {}
+
+    /**
+     * Rebuild the document generate() produced from its stored payload, so the
+     * exact bytes issued can be transmitted without rendering the invoice again.
+     *
+     * @throws EInvoicingException when the contents are not a document of this format for this invoice
+     * @throws NotImplemented for a format the package cannot generate
+     */
+    public static function fromStored(Format $format, string $contents, string $invoiceNumber): self
+    {
+        $storedNumber = self::documentNumber($format, $contents);
+
+        if ($storedNumber !== $invoiceNumber) {
+            throw new EInvoicingException(sprintf(
+                'The stored %s document identifies invoice "%s", not "%s"; it cannot be transmitted as that invoice.',
+                $format->value,
+                $storedNumber,
+                $invoiceNumber,
+            ));
+        }
+
+        return new self(
+            format: $format,
+            contents: $contents,
+            mimeType: $format->mimeType(),
+            filename: $format->filename($invoiceNumber),
+            profile: $format->profile(),
+            invoiceNumber: $invoiceNumber,
+        );
+    }
 
     /**
      * Raw byte length of the payload.
@@ -65,5 +101,34 @@ final readonly class GeneratedDocument
     public function __toString(): string
     {
         return $this->contents;
+    }
+
+    private static function documentNumber(Format $format, string $contents): string
+    {
+        [$roots, $number] = match ($format) {
+            Format::Ubl => [[UblGenerator::INVOICE_NS, UblGenerator::CREDIT_NOTE_NS], '/*/cbc:ID'],
+            Format::Cii => [[CiiGenerator::RSM], '/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:ID'],
+            Format::FacturX => throw NotImplemented::format($format->value),
+        };
+
+        $dom = new DOMDocument;
+        $previous = libxml_use_internal_errors(true);
+        $parsed = $contents !== '' && $dom->loadXML($contents, LIBXML_NONET);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        $xpath = new DOMXPath($dom);
+        $xpath->registerNamespace('cbc', UblGenerator::CBC);
+        $xpath->registerNamespace('rsm', CiiGenerator::RSM);
+        $xpath->registerNamespace('ram', CiiGenerator::RAM);
+        $identifiers = $parsed ? $xpath->query($number) : false;
+        $identifier = $identifiers !== false && $identifiers->length === 1 ? $identifiers->item(0) : null;
+
+        if (! $identifier instanceof DOMElement
+            || ! in_array($dom->documentElement?->namespaceURI, $roots, true)) {
+            throw new EInvoicingException("The stored contents are not a {$format->value} document this package generates.");
+        }
+
+        return $identifier->textContent;
     }
 }

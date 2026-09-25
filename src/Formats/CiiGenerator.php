@@ -25,9 +25,9 @@ use Vimatech\EInvoicing\Formats\Support\InvoiceValidator;
  */
 final class CiiGenerator implements FormatGenerator
 {
-    private const RSM = 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100';
+    public const RSM = 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100';
 
-    private const RAM = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
+    public const RAM = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
 
     private const UDT = 'urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100';
 
