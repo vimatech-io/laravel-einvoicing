@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace Vimatech\EInvoicing\Dtos;
 
 use DateTimeImmutable;
+use Vimatech\EInvoicing\Exceptions\InvalidInvoice;
 
 /**
  * The neutral, format- and network-agnostic invoice model.
  *
  * Everything in this package is produced from, or routed by, a
  * CanonicalInvoice. It deliberately knows nothing about UBL, CII, Peppol or
- * any PDP — those concerns live entirely inside the generators and drivers.
+ * any PDP: those concerns live entirely inside the generators and drivers.
  */
 final readonly class CanonicalInvoice
 {
@@ -39,6 +40,9 @@ final readonly class CanonicalInvoice
      * @param  float  $prepaidAmount  Sum already paid (BT-113).
      * @param  array<string, mixed>  $metadata  Free-form data for routing/tenancy; never serialised into documents.
      * @param  PrecedingInvoiceReference|null  $precedingInvoiceReference  The invoice this document corrects or completes (BG-3).
+     * @param  int  $amountDecimals  ISO 4217 minor unit exponent of the currency (BT-5), as the issuer fixed it: 0 for JPY, 2 for EUR, 3 for TND. The totals are rounded and the arithmetic validated at this scale; a UBL or CII document still refuses any amount with more than 2 decimals.
+     *
+     * @throws InvalidInvoice when $amountDecimals is outside 0 to 4
      */
     public function __construct(
         public string $number,
@@ -60,7 +64,14 @@ final readonly class CanonicalInvoice
         public float $prepaidAmount = 0.0,
         public array $metadata = [],
         public ?PrecedingInvoiceReference $precedingInvoiceReference = null,
-    ) {}
+        public int $amountDecimals = 2,
+    ) {
+        if ($amountDecimals < 0 || $amountDecimals > 4) {
+            throw InvalidInvoice::withViolations([
+                "BT-5: {$amountDecimals} is not an ISO 4217 minor unit for {$currency}; amountDecimals must be between 0 and 4",
+            ]);
+        }
+    }
 
     public function isCreditNote(): bool
     {
@@ -123,6 +134,6 @@ final readonly class CanonicalInvoice
 
     private function round(float $value): float
     {
-        return round($value, 2);
+        return round($value, $this->amountDecimals);
     }
 }
