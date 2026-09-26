@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-09-26
+
 ### Fixed
 
 - The item net price (BT-146) was rendered through the amount formatter and rounded to two decimals:
