@@ -31,7 +31,10 @@ them through pluggable networks (Peppol access points, French PDPs), with per-co
 - **Profile-scoped validation**: mandatory-field and arithmetic checks fail fast with actionable
   messages before anything is rendered or transmitted. The EN 16931 core applies to every document;
   the extra rules of a CIUS apply only when that profile is the one being emitted. Arithmetic checks
-  allow a fixed 0.02 tolerance to absorb per-line rounding.
+  run at the currency's scale and allow two of its smallest units (0.02 at two decimals) to absorb
+  per-line rounding.
+- **No silent rounding**: a value that its XML field cannot carry is refused with an `InvalidInvoice`
+  naming the business term, never rounded into one that fits.
 - **Lifecycle events**: `EInvoiceGenerated`, `EInvoiceDispatched`, `EInvoiceDelivered`,
   `EInvoiceRejected`, `EInvoiceReceived`.
 
@@ -109,6 +112,35 @@ $invoice = new CanonicalInvoice(
 
 > Document totals (line extension, tax exclusive/inclusive, payable) are derived from the lines
 > and the VAT breakdown: you do not pass them in.
+
+#### Precision and currency scale
+
+Values are rendered at the precision they carry, and refused rather than rounded when a field
+cannot hold them:
+
+| Field | Rendered as | Refused when |
+|---|---|---|
+| Amounts (BT-106 to BT-117, BT-131) | exactly 2 decimals | the value has a third decimal (EN 16931 `BR-DEC`) |
+| Unit price (BT-146) | 2 to 6 decimals, trailing zeros trimmed | the value has a seventh decimal |
+| VAT rate (BT-119, BT-152) | 2 to 4 decimals, trailing zeros trimmed | the value has a fifth decimal |
+
+Floats built from exact decimals are accepted as those decimals: `0.1 + 0.2` renders as `0.30`.
+
+The derived totals and the arithmetic checks are rounded at two decimals by default. Pass
+`amountDecimals`, the ISO 4217 minor unit of the currency as you fixed it when issuing, to use
+another scale:
+
+```php
+new CanonicalInvoice(
+    // ...
+    currency: 'JPY',
+    amountDecimals: 0, // 0 for JPY, 2 for EUR, 3 for TND; 0 to 4 accepted
+);
+```
+
+This governs the model, not the XML: a UBL or CII document still refuses an amount with a real third
+decimal, so a TND invoice of 1.235 cannot be emitted, while a JPY invoice renders its whole amounts
+as `1000.00`.
 
 ### 2. Generate a UBL (Peppol BIS 3.0) document
 
@@ -217,7 +249,25 @@ if ($result->messageId !== null) {
 }
 ```
 
-`send()` always fires `EInvoiceDispatched`. `EInvoiceDelivered` fires only for `Delivered` and
+#### Transmit the stored document
+
+`send()` renders the invoice again before transmitting it. To transmit the exact file you stored
+when the invoice was issued, rebuild the `GeneratedDocument` from it and pass it to `transmit()`:
+
+```php
+use Vimatech\EInvoicing\Dtos\GeneratedDocument;
+
+$document = GeneratedDocument::fromStored(Format::Ubl, $storedXml, $invoice->number);
+
+$result = EInvoice::transmit($document, $invoice); // or transmit($document, $invoice, 'peppol')
+```
+
+`fromStored()` sets the MIME type, profile and file name `generate()` would have set, and refuses
+contents that are not a document of that format carrying that invoice number. `transmit()` routes
+with the `CanonicalInvoice`, refuses a document issued for another invoice number, and fires the
+same events as `send()`; `EInvoiceGenerated` is not fired, since nothing is generated.
+
+`send()` and `transmit()` always fire `EInvoiceDispatched`. `EInvoiceDelivered` fires only for `Delivered` and
 `Accepted`, `EInvoiceRejected` only for `Rejected` and `Failed`. A queued submission, a document
 still in transit, or a status your `status_map` does not cover fires neither: poll `fetchStatus()`
 rather than treating the absence of a delivery as a refusal.

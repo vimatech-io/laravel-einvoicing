@@ -15,6 +15,7 @@ use Vimatech\EInvoicing\EInvoiceManager;
  * @method static \Vimatech\EInvoicing\Routing\EInvoiceRouter router()
  * @method static \Vimatech\EInvoicing\Networks\NetworkManager networks()
  * @method static \Vimatech\EInvoicing\Dtos\DispatchResult send(\Vimatech\EInvoicing\Dtos\CanonicalInvoice $invoice, ?\Vimatech\EInvoicing\Enums\Format $format = null, ?string $networkKey = null)
+ * @method static \Vimatech\EInvoicing\Dtos\DispatchResult transmit(\Vimatech\EInvoicing\Dtos\GeneratedDocument $document, \Vimatech\EInvoicing\Dtos\CanonicalInvoice $invoice, ?string $networkKey = null)
  * @method static list<\Vimatech\EInvoicing\Dtos\InboundDocument> receive(string $networkKey)
  * @method static \Vimatech\EInvoicing\Networks\FakeDriver fake(string $networkKey)
  *

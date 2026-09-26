@@ -27,13 +27,13 @@ use Vimatech\EInvoicing\Formats\Support\InvoiceValidator;
  */
 final class UblGenerator implements FormatGenerator
 {
-    private const CBC = 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2';
+    public const CBC = 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2';
 
     private const CAC = 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2';
 
-    private const INVOICE_NS = 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2';
+    public const INVOICE_NS = 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2';
 
-    private const CREDIT_NOTE_NS = 'urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2';
+    public const CREDIT_NOTE_NS = 'urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2';
 
     public const CUSTOMIZATION_ID = 'urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0';
 
@@ -74,8 +74,8 @@ final class UblGenerator implements FormatGenerator
             format: Format::Ubl,
             contents: $builder->toXml(),
             mimeType: Format::Ubl->mimeType(),
-            filename: $this->filename($invoice),
-            profile: self::CUSTOMIZATION_ID,
+            filename: Format::Ubl->filename($invoice->number),
+            profile: Format::Ubl->profile(),
             invoiceNumber: $invoice->number,
         );
     }
@@ -257,7 +257,7 @@ final class UblGenerator implements FormatGenerator
     private function appendTaxTotal(DomBuilder $b, DOMElement $root, CanonicalInvoice $invoice): void
     {
         $taxTotal = $b->child($root, 'cac:TaxTotal');
-        $b->child($taxTotal, 'cbc:TaxAmount', Decimal::amount($invoice->taxAmount()), ['currencyID' => $invoice->currency]);
+        $b->child($taxTotal, 'cbc:TaxAmount', Decimal::amount($invoice->taxAmount(), 'BT-110'), ['currencyID' => $invoice->currency]);
 
         foreach ($invoice->taxBreakdowns as $breakdown) {
             $this->appendTaxSubtotal($b, $taxTotal, $breakdown, $invoice->currency);
@@ -266,13 +266,14 @@ final class UblGenerator implements FormatGenerator
 
     private function appendTaxSubtotal(DomBuilder $b, DOMElement $taxTotal, TaxBreakdown $breakdown, string $currency): void
     {
+        $label = "VAT breakdown {$breakdown->category}";
         $subtotal = $b->child($taxTotal, 'cac:TaxSubtotal');
-        $b->child($subtotal, 'cbc:TaxableAmount', Decimal::amount($breakdown->taxableAmount), ['currencyID' => $currency]);
-        $b->child($subtotal, 'cbc:TaxAmount', Decimal::amount($breakdown->taxAmount), ['currencyID' => $currency]);
+        $b->child($subtotal, 'cbc:TaxableAmount', Decimal::amount($breakdown->taxableAmount, "{$label} (BT-116)"), ['currencyID' => $currency]);
+        $b->child($subtotal, 'cbc:TaxAmount', Decimal::amount($breakdown->taxAmount, "{$label} (BT-117)"), ['currencyID' => $currency]);
 
         $category = $b->child($subtotal, 'cac:TaxCategory');
         $b->child($category, 'cbc:ID', $breakdown->category);
-        $b->child($category, 'cbc:Percent', Decimal::percent($breakdown->percent));
+        $b->child($category, 'cbc:Percent', Decimal::percent($breakdown->percent, "{$label} (BT-119)"));
 
         if ($breakdown->exemptionReasonCode !== null) {
             $b->child($category, 'cbc:TaxExemptionReasonCode', $breakdown->exemptionReasonCode);
@@ -291,15 +292,15 @@ final class UblGenerator implements FormatGenerator
         $total = $b->child($root, 'cac:LegalMonetaryTotal');
         $currency = ['currencyID' => $invoice->currency];
 
-        $b->child($total, 'cbc:LineExtensionAmount', Decimal::amount($invoice->lineExtensionAmount()), $currency);
-        $b->child($total, 'cbc:TaxExclusiveAmount', Decimal::amount($invoice->taxExclusiveAmount()), $currency);
-        $b->child($total, 'cbc:TaxInclusiveAmount', Decimal::amount($invoice->taxInclusiveAmount()), $currency);
+        $b->child($total, 'cbc:LineExtensionAmount', Decimal::amount($invoice->lineExtensionAmount(), 'BT-106'), $currency);
+        $b->child($total, 'cbc:TaxExclusiveAmount', Decimal::amount($invoice->taxExclusiveAmount(), 'BT-109'), $currency);
+        $b->child($total, 'cbc:TaxInclusiveAmount', Decimal::amount($invoice->taxInclusiveAmount(), 'BT-112'), $currency);
 
         if ($invoice->prepaidAmount > 0) {
-            $b->child($total, 'cbc:PrepaidAmount', Decimal::amount($invoice->prepaidAmount), $currency);
+            $b->child($total, 'cbc:PrepaidAmount', Decimal::amount($invoice->prepaidAmount, 'BT-113'), $currency);
         }
 
-        $b->child($total, 'cbc:PayableAmount', Decimal::amount($invoice->payableAmount()), $currency);
+        $b->child($total, 'cbc:PayableAmount', Decimal::amount($invoice->payableAmount(), 'BT-115'), $currency);
     }
 
     private function appendLines(DomBuilder $b, DOMElement $root, CanonicalInvoice $invoice, bool $isCreditNote): void
@@ -311,6 +312,7 @@ final class UblGenerator implements FormatGenerator
 
     private function appendLine(DomBuilder $b, DOMElement $root, LineItem $line, string $currency, bool $isCreditNote): void
     {
+        $label = "Line {$line->id}";
         $lineEl = $b->child($root, $isCreditNote ? 'cac:CreditNoteLine' : 'cac:InvoiceLine');
         $b->child($lineEl, 'cbc:ID', $line->id);
 
@@ -321,7 +323,7 @@ final class UblGenerator implements FormatGenerator
             ['unitCode' => $line->unitCode],
         );
 
-        $b->child($lineEl, 'cbc:LineExtensionAmount', Decimal::amount($line->lineExtensionAmount), ['currencyID' => $currency]);
+        $b->child($lineEl, 'cbc:LineExtensionAmount', Decimal::amount($line->lineExtensionAmount, "{$label} (BT-131)"), ['currencyID' => $currency]);
 
         $item = $b->child($lineEl, 'cac:Item');
         if ($line->description !== null) {
@@ -341,22 +343,15 @@ final class UblGenerator implements FormatGenerator
 
         $taxCategory = $b->child($item, 'cac:ClassifiedTaxCategory');
         $b->child($taxCategory, 'cbc:ID', $line->taxCategory);
-        $b->child($taxCategory, 'cbc:Percent', Decimal::percent($line->taxPercent));
+        $b->child($taxCategory, 'cbc:Percent', Decimal::percent($line->taxPercent, "{$label} (BT-152)"));
         $scheme = $b->child($taxCategory, 'cac:TaxScheme');
         $b->child($scheme, 'cbc:ID', self::VAT_SCHEME);
 
         $price = $b->child($lineEl, 'cac:Price');
-        $b->child($price, 'cbc:PriceAmount', Decimal::amount($line->netPrice), ['currencyID' => $currency]);
+        $b->child($price, 'cbc:PriceAmount', Decimal::unitPrice($line->netPrice, "{$label} (BT-146)"), ['currencyID' => $currency]);
 
         if ($line->baseQuantity !== null) {
             $b->child($price, 'cbc:BaseQuantity', Decimal::quantity($line->baseQuantity), ['unitCode' => $line->unitCode]);
         }
-    }
-
-    private function filename(CanonicalInvoice $invoice): string
-    {
-        $safe = preg_replace('/[^A-Za-z0-9._-]/', '-', $invoice->number) ?? 'invoice';
-
-        return $safe.'.xml';
     }
 }

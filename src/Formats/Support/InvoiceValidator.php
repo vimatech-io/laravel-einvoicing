@@ -30,7 +30,8 @@ final class InvoiceValidator
     /** VAT categories that require an exemption reason or code. */
     private const EXEMPTION_CATEGORIES = ['E', 'AE', 'G', 'O', 'K'];
 
-    private const TOLERANCE = 0.02;
+    /** Rounding slack absorbed by the arithmetic checks, in units of the currency's smallest amount. */
+    private const TOLERANCE_UNITS = 2;
 
     /**
      * @throws InvalidInvoice
@@ -116,7 +117,7 @@ final class InvoiceValidator
         }
 
         foreach ($invoice->lines as $index => $line) {
-            $this->validateLine($violations, $index, $line);
+            $this->validateLine($violations, $index, $line, $invoice->amountDecimals);
         }
 
         foreach ($invoice->taxBreakdowns as $index => $breakdown) {
@@ -149,7 +150,7 @@ final class InvoiceValidator
     /**
      * @param  list<string>  $violations
      */
-    private function validateLine(array &$violations, int $index, LineItem $line): void
+    private function validateLine(array &$violations, int $index, LineItem $line, int $decimals): void
     {
         $position = $line->id !== '' ? $line->id : (string) ($index + 1);
 
@@ -169,8 +170,8 @@ final class InvoiceValidator
             $violations[] = "Line {$position} (BT-152): the VAT rate cannot be negative";
         }
 
-        $expected = round($line->quantity * $line->netPrice, 2);
-        if (abs($expected - round($line->lineExtensionAmount, 2)) > self::TOLERANCE) {
+        $expected = round($line->quantity * $line->netPrice, $decimals);
+        if (abs($expected - round($line->lineExtensionAmount, $decimals)) > self::tolerance($decimals)) {
             $violations[] = "Line {$position} (BT-131): net amount {$line->lineExtensionAmount} does not match quantity × price ({$expected})";
         }
     }
@@ -208,8 +209,9 @@ final class InvoiceValidator
             $violations[] = 'BR-S-02: the seller VAT identifier (BT-31) is required when standard-rated VAT is applied';
         }
 
-        $expectedTax = round($breakdown->taxableAmount * $breakdown->percent / 100, 2);
-        if (abs($expectedTax - round($breakdown->taxAmount, 2)) > self::TOLERANCE) {
+        $decimals = $invoice->amountDecimals;
+        $expectedTax = round($breakdown->taxableAmount * $breakdown->percent / 100, $decimals);
+        if (abs($expectedTax - round($breakdown->taxAmount, $decimals)) > self::tolerance($decimals)) {
             $violations[] = "{$label} (BR-CO-17): VAT amount {$breakdown->taxAmount} does not match taxable {$breakdown->taxableAmount} × {$breakdown->percent}% ({$expectedTax})";
         }
     }
@@ -227,10 +229,15 @@ final class InvoiceValidator
         $taxableSum = round(array_sum(array_map(
             static fn (TaxBreakdown $tax): float => $tax->taxableAmount,
             $invoice->taxBreakdowns,
-        )), 2);
+        )), $invoice->amountDecimals);
 
-        if (abs($lineSum - $taxableSum) > self::TOLERANCE) {
+        if (abs($lineSum - $taxableSum) > self::tolerance($invoice->amountDecimals)) {
             $violations[] = "BR-CO-10: the sum of line net amounts ({$lineSum}) must equal the sum of VAT taxable amounts ({$taxableSum})";
         }
+    }
+
+    private static function tolerance(int $decimals): float
+    {
+        return self::TOLERANCE_UNITS / 10 ** $decimals;
     }
 }

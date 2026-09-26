@@ -25,9 +25,9 @@ use Vimatech\EInvoicing\Formats\Support\InvoiceValidator;
  */
 final class CiiGenerator implements FormatGenerator
 {
-    private const RSM = 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100';
+    public const RSM = 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100';
 
-    private const RAM = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
+    public const RAM = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
 
     private const UDT = 'urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100';
 
@@ -63,8 +63,8 @@ final class CiiGenerator implements FormatGenerator
             format: Format::Cii,
             contents: $builder->toXml(),
             mimeType: Format::Cii->mimeType(),
-            filename: $this->filename($invoice),
-            profile: self::GUIDELINE_ID,
+            filename: Format::Cii->filename($invoice->number),
+            profile: Format::Cii->profile(),
             invoiceNumber: $invoice->number,
         );
     }
@@ -106,6 +106,7 @@ final class CiiGenerator implements FormatGenerator
 
     private function appendLine(DomBuilder $b, DOMElement $transaction, LineItem $line): void
     {
+        $label = "Line {$line->id}";
         $item = $b->child($transaction, 'ram:IncludedSupplyChainTradeLineItem');
 
         $lineDoc = $b->child($item, 'ram:AssociatedDocumentLineDocument');
@@ -122,7 +123,7 @@ final class CiiGenerator implements FormatGenerator
 
         $agreement = $b->child($item, 'ram:SpecifiedLineTradeAgreement');
         $price = $b->child($agreement, 'ram:NetPriceProductTradePrice');
-        $b->child($price, 'ram:ChargeAmount', Decimal::amount($line->netPrice));
+        $b->child($price, 'ram:ChargeAmount', Decimal::unitPrice($line->netPrice, "{$label} (BT-146)"));
 
         $delivery = $b->child($item, 'ram:SpecifiedLineTradeDelivery');
         $b->child($delivery, 'ram:BilledQuantity', Decimal::quantity($line->quantity), ['unitCode' => $line->unitCode]);
@@ -131,10 +132,10 @@ final class CiiGenerator implements FormatGenerator
         $tax = $b->child($settlement, 'ram:ApplicableTradeTax');
         $b->child($tax, 'ram:TypeCode', self::VAT_TYPE);
         $b->child($tax, 'ram:CategoryCode', $line->taxCategory);
-        $b->child($tax, 'ram:RateApplicablePercent', Decimal::percent($line->taxPercent));
+        $b->child($tax, 'ram:RateApplicablePercent', Decimal::percent($line->taxPercent, "{$label} (BT-152)"));
 
         $summation = $b->child($settlement, 'ram:SpecifiedTradeSettlementLineMonetarySummation');
-        $b->child($summation, 'ram:LineTotalAmount', Decimal::amount($line->lineExtensionAmount));
+        $b->child($summation, 'ram:LineTotalAmount', Decimal::amount($line->lineExtensionAmount, "{$label} (BT-131)"));
     }
 
     private function appendHeaderAgreement(DomBuilder $b, DOMElement $transaction, CanonicalInvoice $invoice): void
@@ -248,43 +249,37 @@ final class CiiGenerator implements FormatGenerator
 
     private function appendHeaderTax(DomBuilder $b, DOMElement $settlement, TaxBreakdown $breakdown, string $currency): void
     {
+        $label = "VAT breakdown {$breakdown->category}";
         $tax = $b->child($settlement, 'ram:ApplicableTradeTax');
-        $b->child($tax, 'ram:CalculatedAmount', Decimal::amount($breakdown->taxAmount));
+        $b->child($tax, 'ram:CalculatedAmount', Decimal::amount($breakdown->taxAmount, "{$label} (BT-117)"));
         $b->child($tax, 'ram:TypeCode', self::VAT_TYPE);
 
         if ($breakdown->exemptionReason !== null) {
             $b->child($tax, 'ram:ExemptionReason', $breakdown->exemptionReason);
         }
 
-        $b->child($tax, 'ram:BasisAmount', Decimal::amount($breakdown->taxableAmount));
+        $b->child($tax, 'ram:BasisAmount', Decimal::amount($breakdown->taxableAmount, "{$label} (BT-116)"));
         $b->child($tax, 'ram:CategoryCode', $breakdown->category);
 
         if ($breakdown->exemptionReasonCode !== null) {
             $b->child($tax, 'ram:ExemptionReasonCode', $breakdown->exemptionReasonCode);
         }
 
-        $b->child($tax, 'ram:RateApplicablePercent', Decimal::percent($breakdown->percent));
+        $b->child($tax, 'ram:RateApplicablePercent', Decimal::percent($breakdown->percent, "{$label} (BT-119)"));
     }
 
     private function appendSummation(DomBuilder $b, DOMElement $settlement, CanonicalInvoice $invoice): void
     {
         $summation = $b->child($settlement, 'ram:SpecifiedTradeSettlementHeaderMonetarySummation');
-        $b->child($summation, 'ram:LineTotalAmount', Decimal::amount($invoice->lineExtensionAmount()));
-        $b->child($summation, 'ram:TaxBasisTotalAmount', Decimal::amount($invoice->taxExclusiveAmount()));
-        $b->child($summation, 'ram:TaxTotalAmount', Decimal::amount($invoice->taxAmount()), ['currencyID' => $invoice->currency]);
-        $b->child($summation, 'ram:GrandTotalAmount', Decimal::amount($invoice->taxInclusiveAmount()));
+        $b->child($summation, 'ram:LineTotalAmount', Decimal::amount($invoice->lineExtensionAmount(), 'BT-106'));
+        $b->child($summation, 'ram:TaxBasisTotalAmount', Decimal::amount($invoice->taxExclusiveAmount(), 'BT-109'));
+        $b->child($summation, 'ram:TaxTotalAmount', Decimal::amount($invoice->taxAmount(), 'BT-110'), ['currencyID' => $invoice->currency]);
+        $b->child($summation, 'ram:GrandTotalAmount', Decimal::amount($invoice->taxInclusiveAmount(), 'BT-112'));
 
         if ($invoice->prepaidAmount > 0) {
-            $b->child($summation, 'ram:TotalPrepaidAmount', Decimal::amount($invoice->prepaidAmount));
+            $b->child($summation, 'ram:TotalPrepaidAmount', Decimal::amount($invoice->prepaidAmount, 'BT-113'));
         }
 
-        $b->child($summation, 'ram:DuePayableAmount', Decimal::amount($invoice->payableAmount()));
-    }
-
-    private function filename(CanonicalInvoice $invoice): string
-    {
-        $safe = preg_replace('/[^A-Za-z0-9._-]/', '-', $invoice->number) ?? 'invoice';
-
-        return $safe.'-cii.xml';
+        $b->child($summation, 'ram:DuePayableAmount', Decimal::amount($invoice->payableAmount(), 'BT-115'));
     }
 }
