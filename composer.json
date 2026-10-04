@@ -9,7 +9,6 @@
         "ubl",
         "cii",
         "en16931",
-        "facturx",
         "invoice"
     ],
     "homepage": "https://github.com/vimatech-io/laravel-einvoicing",

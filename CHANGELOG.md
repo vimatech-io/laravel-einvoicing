@@ -204,7 +204,7 @@ invoice itself. Every entry below under **Changed**, **Fixed** and **Removed** c
 
 - The undocumented `payload` fallback key in `PeppolDriver`'s inbound mapping, which read an
   alternate response shape by guesswork.
-- `ext-xmlwriter` and `ext-libxml` from `require`: neither is used anywhere in the package.
+- `ext-xmlwriter` and `ext-libxml` from `require`. `ext-xmlwriter` is not used anywhere in the package. `ext-libxml` is used only by `GeneratedDocument` (`libxml_use_internal_errors()` and `LIBXML_NONET`) and comes with `ext-dom`, which stays required.
 
 ### Upgrading from 1.x
 
