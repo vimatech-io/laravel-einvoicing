@@ -9,10 +9,14 @@
         "ubl",
         "cii",
         "en16931",
-        "facturx",
         "invoice"
     ],
     "homepage": "https://github.com/vimatech-io/laravel-einvoicing",
+    "support": {
+        "issues": "https://github.com/vimatech-io/laravel-einvoicing/issues",
+        "source": "https://github.com/vimatech-io/laravel-einvoicing",
+        "security": "https://github.com/vimatech-io/laravel-einvoicing/blob/main/SECURITY.md"
+    },
     "license": "MIT",
     "authors": [
         {

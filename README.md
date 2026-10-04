@@ -12,8 +12,8 @@
 [![Total Downloads](https://img.shields.io/packagist/dt/vimatech/laravel-einvoicing.svg)](https://packagist.org/packages/vimatech/laravel-einvoicing)
 [![License](https://img.shields.io/packagist/l/vimatech/laravel-einvoicing.svg)](https://packagist.org/packages/vimatech/laravel-einvoicing)
 
-Generate compliant structured e-invoices **natively** for Laravel 11, 12 and 13, and dispatch
-them through pluggable networks (Peppol access points, French PDPs), with per-country routing.
+Generate structured e-invoices **natively** (Peppol BIS Billing 3.0 UBL and EN 16931 CII) for
+Laravel 11, 12 and 13, and dispatch them through pluggable networks (Peppol access points, French PDPs), with per-country routing.
 
 > **Zero third-party runtime dependencies.** Every document is built with PHP's own `ext-dom`;
 > every network call uses Laravel's own HTTP client. No `horstoeko/zugferd`, no UBL libraries,
