@@ -70,8 +70,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The validator refused every invoice that carried neither a buyer reference (BT-10) nor a purchase
   order reference (BT-13), reporting it as `BR-AB`. **No rule with that identifier exists.** In the
   EN 16931 semantic model both terms are `0..1`, and none of the core rules published in the CEN
-  validation artefacts references either one. The requirement is `PEPPOL-EN16931-R003` — "A buyer
-  reference or purchase order reference MUST be provided" — which belongs to Peppol BIS Billing 3.0,
+  validation artefacts references either one. The requirement is `PEPPOL-EN16931-R003` ("A buyer
+  reference or purchase order reference MUST be provided"), which belongs to Peppol BIS Billing 3.0,
   not to the standard it profiles.
 
   Enforcing it on every document rejected invoices that EN 16931 accepts, including the ordinary
@@ -99,13 +99,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 1. Nothing is required. Every document that generated before still generates, byte for byte.
 2. Invoices previously refused for a missing buyer or purchase order reference now generate as CII
-   and as plain EN 16931. If you relied on that refusal — because you transmit through Peppol, or to
-   a CIUS that carries the requirement, such as XRechnung via `BR-DE-15` — validate explicitly with
+   and as plain EN 16931. If you relied on that refusal (because you transmit through Peppol, or to
+   a CIUS that carries the requirement, such as XRechnung via `BR-DE-15`), validate explicitly with
    `InvoiceValidator::assertConformsTo($invoice, ValidationProfile::PeppolBis)`.
 3. The requirement remains enforced, unchanged, for every UBL document: `UblGenerator` emits Peppol
    BIS Billing 3.0 and validates against it.
 
-## [2.1.0] - 2026-09-04
+## [2.1.0] - 2026-09-03
 
 ### Added
 
@@ -113,7 +113,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   constructor argument, carrying EN 16931 group **BG-3**: the number of the referenced invoice
   (BT-25) and, optionally, its issue date (BT-26). The canonical model previously had no way to
   express which invoice a credit note corrects, so the information could not reach a document at
-  all — and a credit note that names no preceding invoice is rejected by the profiles that require
+  all, and a credit note that names no preceding invoice is rejected by the profiles that require
   the group, at transmission rather than at build time.
 - `UblGenerator` emits it as `cac:BillingReference/cac:InvoiceDocumentReference`, sequenced between
   `cac:OrderReference` and `cac:AccountingSupplierParty`.
@@ -130,7 +130,7 @@ Neither generator keys the group on the document type. EN 16931 makes BG-3 condi
 valid on a `380` invoice, where it references the partial or pre-payment invoices a final invoice
 completes; a credit note is not required by the standard itself to carry it. Requiring it for
 `typeCode` `381` would refuse documents the standard accepts and would break every consumer already
-producing credit notes without it — it is therefore not enforced here, and remains a candidate for
+producing credit notes without it. It is therefore not enforced here, and remains a candidate for
 a future major.
 
 ## [2.0.0] - 2026-09-01
@@ -145,7 +145,7 @@ invoice itself. Every entry below under **Changed**, **Fixed** and **Removed** c
 ### Fixed
 
 - Inbound documents whose body could not be base64-decoded were handed to the application as the
-  raw, undecoded string, presented as a valid invoice body — a corrupt fiscal document indexed and
+  raw, undecoded string, presented as a valid invoice body: a corrupt fiscal document indexed and
   processed as a real one. `PeppolDriver::receive()` and `FrPdpDriver::receive()` now raise
   `NetworkException` naming the offending message id, and the batch stops rather than returning the
   readable part of it. A body that was valid base64 but decoded to a falsy string (`"0"`) was
@@ -160,14 +160,14 @@ invoice itself. Every entry below under **Changed**, **Fixed** and **Removed** c
   `countries` entry or `paths` entry was dropped without a word. Whole-number and boolean strings
   are now understood; anything unreadable raises `InvalidDriverConfig`.
 - `EInvoiceDelivered` was dispatched for every status not classed as a failure, including
-  `Submitted` and `InTransit` — announcing the delivery of an invoice that was merely queued. It is
+  `Submitted` and `InTransit`, announcing the delivery of an invoice that was merely queued. It is
   now dispatched only for `Delivered` and `Accepted`.
 - `EInvoiceRejected` was dispatched for `Unknown`, reporting a status absent from the driver's
   `status_map` as a refusal by the recipient. It is now dispatched only for `Rejected` and
   `Failed`; a status that is neither an arrival nor a refusal dispatches `EInvoiceDispatched`
   alone.
 - `AbstractHttpDriver::exchange()` converted every exception into a transport failure, including a
-  configuration error raised while building the request — presenting a permanent misconfiguration
+  configuration error raised while building the request, presenting a permanent misconfiguration
   as a retryable network fault.
 - `NetworkException::transport()` discarded the original exception. It is now chained as
   `$previous`, so the partner's response body and the original stack trace survive.
@@ -211,7 +211,7 @@ invoice itself. Every entry below under **Changed**, **Fixed** and **Removed** c
 1. Every HTTP network must have a `token`, or declare `'auth' => 'none'`. A network with neither
    now throws on its first request instead of transmitting unauthenticated.
 2. Check the values your `networks` config actually passes. Settings that were being ignored are
-   now applied — a `timeout` or `verify` you set but never took effect will start taking effect —
+   now applied: a `timeout` or `verify` you set but never took effect will start taking effect,
    and a value that cannot be read now throws at request time instead of falling back.
 3. Remove any `(int)` or `(bool)` cast around `env()` in your network config. The cast turns an
    unparseable value into `0` or `false`; passing the raw value lets the package report it.
@@ -219,7 +219,7 @@ invoice itself. Every entry below under **Changed**, **Fixed** and **Removed** c
    extend the driver and override `decodeInbound()`.
 5. If you treat `EInvoiceDelivered` as "the invoice reached the recipient", that is now what it
    means; you will stop receiving it for submissions still in flight. If you relied on
-   `EInvoiceRejected` firing for `Unknown`, poll `fetchStatus()` instead — and complete your
+   `EInvoiceRejected` firing for `Unknown`, poll `fetchStatus()` instead, and complete your
    `status_map` so the partner's vocabulary is actually covered.
 6. `GeneratedDocument::save()` throws instead of returning `0`; drop any `if ($bytes === 0)` check.
 
@@ -229,11 +229,11 @@ invoice itself. Every entry below under **Changed**, **Fixed** and **Removed** c
 
 - Initial release.
 - `CanonicalInvoice`, `Party`, `LineItem`, `TaxBreakdown`, `GeneratedDocument`, `DispatchResult`,
-  `NetworkCapabilities` and `InboundDocument` readonly DTOs — the neutral, format/network-agnostic
+  `NetworkCapabilities` and `InboundDocument` readonly DTOs: the neutral, format/network-agnostic
   domain model.
 - `Format` (`Ubl`, `Cii`, `FacturX`) and `LifecycleStatus` enums.
 - Native `UblGenerator` producing Peppol BIS Billing 3.0 invoices and credit notes with
-  `DOMDocument` — no third-party libraries.
+  `DOMDocument`, with no third-party libraries.
 - Native `CiiGenerator` producing EN 16931 Cross Industry Invoice.
 - `FacturXGenerator` placeholder that throws `NotImplemented` until the isolated PDF/A-3 module ships.
 - Native EN 16931 mandatory-field and arithmetic validation (`InvoiceValidator`) throwing
@@ -242,7 +242,7 @@ invoice itself. Every entry below under **Changed**, **Fixed** and **Removed** c
   dependency-free `FakeDriver` for consumer test suites.
 - Config-driven `NetworkManager` (built-in driver aliases, custom class resolution, `extend()`,
   `fake()`).
-- `EInvoiceRouter` — per-country resolution with explicit fallback (`UnsupportedCountry`) and a
+- `EInvoiceRouter`: per-country resolution with explicit fallback (`UnsupportedCountry`) and a
   per-tenant override hook.
 - `EInvoice` facade and `EInvoiceManager` orchestrator.
 - Lifecycle events: `EInvoiceGenerated`, `EInvoiceDispatched`, `EInvoiceDelivered`,
@@ -251,3 +251,10 @@ invoice itself. Every entry below under **Changed**, **Fixed** and **Removed** c
 - Test suite (Pest + orchestra/testbench) including UBL golden-file assertions, validation, routing
   and fallback, FakeDriver send/status/receive, events and a `Http::fake`-driven Peppol driver test.
 - CI tooling: Pint (PSR-12 + strict types), PHPStan/Larastan level max.
+
+[Unreleased]: https://github.com/vimatech-io/laravel-einvoicing/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/vimatech-io/laravel-einvoicing/compare/v2.2.0...v2.3.0
+[2.2.0]: https://github.com/vimatech-io/laravel-einvoicing/compare/v2.1.0...v2.2.0
+[2.1.0]: https://github.com/vimatech-io/laravel-einvoicing/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/vimatech-io/laravel-einvoicing/compare/v1.0.0...v2.0.0
+[1.0.0]: https://github.com/vimatech-io/laravel-einvoicing/releases/tag/v1.0.0

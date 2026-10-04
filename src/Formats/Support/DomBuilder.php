@@ -60,7 +60,7 @@ final class DomBuilder
 
         if ($value !== null) {
             // createTextNode escapes &, < and > natively, which createElementNS's
-            // value argument does not — so all text content goes through it.
+            // value argument does not, so all text content goes through it.
             $element->appendChild($this->dom->createTextNode($value));
         }
 
