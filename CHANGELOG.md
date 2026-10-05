@@ -23,10 +23,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A document whose format can be neither read from the declaration nor recognised in its contents
   is no longer returned. It is reported to the application's exception handler as
   `UnrecognisedInboundDocument`, and the other documents of the batch are returned as usual, so one
-  unreadable document cannot keep the rest of an inbox from being read. This applies to every
-  driver `NetworkManager` builds itself (`peppol`, `fr_pdp`, or an `AbstractHttpDriver` subclass
-  referenced by class). A driver built without an exception handler, by hand or in an `extend()`
-  factory, throws the exception instead, which stops the batch.
+  unreadable document cannot keep the rest of an inbox from being read. This applies to `peppol`,
+  `fr_pdp`, and an `AbstractHttpDriver` subclass referenced by class whose constructor passes the
+  fourth argument on to `AbstractHttpDriver`. A driver left without an exception handler (built by
+  hand, in an `extend()` factory, or by a constructor that drops the argument) throws the exception
+  instead, which stops the batch.
 
 ### Added
 
@@ -37,7 +38,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the document.
 - `AbstractHttpDriver` accepts an optional `ExceptionHandler` as a fourth constructor argument,
   which `NetworkManager` passes to the built-in drivers and to any `AbstractHttpDriver` subclass it
-  instantiates, and exposes `inboundDocuments()` and `inboundFormat()` to subclasses that read an
+  instantiates by class, and exposes `inboundDocuments()` and `inboundFormat()` to subclasses that read an
   inbox.
 
 ### Upgrading from 2.3.0
@@ -47,9 +48,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 2. Inbound documents without a declared format may now carry a different `format` than before.
    Anything that branches on `InboundDocument::$format` should handle `Format::FacturX`.
 3. Unrecognisable inbound documents appear in your exception reports instead of in the batch.
-4. A subclass of `AbstractHttpDriver` whose constructor takes a fourth parameter of another type
-   now receives the `ExceptionHandler` there when `NetworkManager` builds it. Accept it as the fourth
-   argument, or register the driver with `extend()`.
+4. A subclass of `AbstractHttpDriver` that redefines the constructor needs checking when
+   `NetworkManager` builds it by class, since it now passes the `ExceptionHandler` as a fourth
+   argument:
+   - a constructor whose fourth parameter has another type receives the `ExceptionHandler` there;
+   - a constructor with three parameters that calls `parent::__construct($http, $config, $key)`
+     drops the handler without any message, and its `receive()` then throws
+     `UnrecognisedInboundDocument` and stops the batch on the first unrecognisable document.
+
+   Accept the `ExceptionHandler` as the fourth parameter and pass it to `parent::__construct()`.
 
 ## [2.3.0] - 2026-09-26
 

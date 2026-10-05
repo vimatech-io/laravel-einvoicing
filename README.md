@@ -308,9 +308,11 @@ $exceptions->reportable(function (UnrecognisedInboundDocument $e) {
 });
 ```
 
-This applies to drivers built by the package (`peppol`, `fr_pdp`, or an `AbstractHttpDriver`
-subclass referenced by class). A driver you build by hand, or in an `extend()` factory, without an
-exception handler throws the exception instead, which stops the batch.
+This applies to `peppol`, `fr_pdp`, and an `AbstractHttpDriver` subclass referenced by class, provided
+its constructor, if it defines one, accepts the fourth argument (an `ExceptionHandler`) and passes it
+to `parent::__construct()`. A driver left without an exception handler (built by hand, in an
+`extend()` factory, or by a constructor that drops the argument) throws the exception instead, which
+stops the batch.
 
 ## Configuration
 
