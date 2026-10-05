@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Request;
+use Vimatech\EInvoicing\Enums\Format;
 use Vimatech\EInvoicing\Enums\LifecycleStatus;
 use Vimatech\EInvoicing\Exceptions\InvalidDriverConfig;
 use Vimatech\EInvoicing\Exceptions\NetworkException;
+use Vimatech\EInvoicing\Formats\CiiGenerator;
 use Vimatech\EInvoicing\Formats\UblGenerator;
 use Vimatech\EInvoicing\Networks\PeppolDriver;
 use Vimatech\EInvoicing\Tests\Support\InvoiceFactory;
+use Vimatech\EInvoicing\Tests\Support\RecordingExceptionHandler;
 
 function peppolDriver(HttpFactory $http, array $extra = []): PeppolDriver
 {
@@ -120,9 +123,41 @@ it('decodes an inbound body that base64-decodes to a falsy string', function () 
     $http = new HttpFactory;
     $http->fake([
         '*/inbound' => $http->response([
-            'documents' => [['id' => 'in-3', 'document' => base64_encode('0')]],
+            'documents' => [['id' => 'in-3', 'format' => 'ubl', 'document' => base64_encode('0')]],
         ], 200),
     ]);
 
     expect(peppolDriver($http)->receive()[0]->contents)->toBe('0');
+});
+
+it('labels an undeclared CII document as CII rather than UBL', function () {
+    $cii = (new CiiGenerator)->generate(InvoiceFactory::standardInvoice())->contents;
+    $http = new HttpFactory;
+    $http->fake([
+        '*/inbound' => $http->response([
+            'documents' => [['id' => 'in-cii', 'document' => base64_encode($cii)]],
+        ], 200),
+    ]);
+
+    expect(peppolDriver($http)->receive()[0]->format)->toBe(Format::Cii);
+});
+
+it('reports an unrecognisable inbound document and still returns the others', function () {
+    $ubl = (new UblGenerator)->generate(InvoiceFactory::standardInvoice())->contents;
+    $exceptions = new RecordingExceptionHandler;
+    $http = new HttpFactory;
+    $http->fake([
+        '*/inbound' => $http->response([
+            'documents' => [
+                ['id' => 'in-unknown', 'document' => base64_encode('not an invoice')],
+                ['id' => 'in-ubl', 'document' => base64_encode($ubl)],
+            ],
+        ], 200),
+    ]);
+
+    $documents = (new PeppolDriver($http, ['base_url' => 'https://ap.example.test', 'token' => 't'], 'peppol', $exceptions))->receive();
+
+    expect($documents)->toHaveCount(1)
+        ->and($documents[0]->messageId)->toBe('in-ubl')
+        ->and($exceptions->reported[0]->messageId)->toBe('in-unknown');
 });

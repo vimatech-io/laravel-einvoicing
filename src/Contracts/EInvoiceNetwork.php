@@ -10,6 +10,7 @@ use Vimatech\EInvoicing\Dtos\GeneratedDocument;
 use Vimatech\EInvoicing\Dtos\InboundDocument;
 use Vimatech\EInvoicing\Dtos\NetworkCapabilities;
 use Vimatech\EInvoicing\Exceptions\NetworkException;
+use Vimatech\EInvoicing\Exceptions\UnrecognisedInboundDocument;
 
 /**
  * A pluggable e-invoicing network (Peppol access point, French PDP, ...).
@@ -46,6 +47,7 @@ interface EInvoiceNetwork
      * @return list<InboundDocument>
      *
      * @throws NetworkException
+     * @throws UnrecognisedInboundDocument when the driver has no exception handler to report it to
      */
     public function receive(): array;
 

@@ -7,6 +7,57 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `FrPdpDriver::capabilities()` listed `Format::FacturX`, which the package cannot generate: an
+  application choosing its format with `supports(Format::FacturX)` was told yes, then
+  `generate()` threw `NotImplemented`. The driver now declares `Format::Ubl` and `Format::Cii` only.
+- An inbound document whose `format` field was absent or not a value of `Format` was labelled with
+  a default: `cii` by `FrPdpDriver::receive()`, `ubl` by `PeppolDriver::receive()`. A Factur-X PDF
+  delivered without a format reached the application as a CII invoice, and a CII document on a
+  Peppol inbox as a UBL one. Both drivers now read the decoded contents instead: a PDF (`%PDF-`) is
+  `Format::FacturX`; an XML document whose root is `CrossIndustryInvoice` in the CII namespace is
+  `Format::Cii`; a root `Invoice` or `CreditNote` in its UBL namespace is `Format::Ubl`. A root
+  with the right name but no namespace, or another namespace, is not taken for either. A format the
+  partner declares and the package knows is still used as declared.
+- A document whose format can be neither read from the declaration nor recognised in its contents
+  is no longer returned. It is reported to the application's exception handler as
+  `UnrecognisedInboundDocument`, and the other documents of the batch are returned as usual, so one
+  unreadable document cannot keep the rest of an inbox from being read. This applies to `peppol`,
+  `fr_pdp`, and an `AbstractHttpDriver` subclass referenced by class whose constructor passes the
+  fourth argument on to `AbstractHttpDriver`. A driver left without an exception handler (built by
+  hand, in an `extend()` factory, or by a constructor that drops the argument) throws the exception
+  instead, which stops the batch.
+
+### Added
+
+- `Vimatech\EInvoicing\Exceptions\UnrecognisedInboundDocument`, extending `EInvoicingException`,
+  carrying the `network`, the `messageId`, the `declaredFormat` (or `null`) and the provider's `raw`
+  entry, including the still-encoded body. Its `context()` (network, message id, declared format) is
+  what Laravel adds to the log entry. Register a `reportable()` callback for it to keep or alert on
+  the document.
+- `AbstractHttpDriver` accepts an optional `ExceptionHandler` as a fourth constructor argument,
+  which `NetworkManager` passes to the built-in drivers and to any `AbstractHttpDriver` subclass it
+  instantiates by class, and exposes `inboundDocuments()` and `inboundFormat()` to subclasses that read an
+  inbox.
+
+### Upgrading from 2.3.0
+
+1. Code that selected Factur-X on the `fr_pdp` network because `supports()` said so was failing at
+   generation; it now gets `false` and should fall back to `Format::Cii` or `Format::Ubl`.
+2. Inbound documents without a declared format may now carry a different `format` than before.
+   Anything that branches on `InboundDocument::$format` should handle `Format::FacturX`.
+3. Unrecognisable inbound documents appear in your exception reports instead of in the batch.
+4. A subclass of `AbstractHttpDriver` that redefines the constructor needs checking when
+   `NetworkManager` builds it by class, since it now passes the `ExceptionHandler` as a fourth
+   argument:
+   - a constructor whose fourth parameter has another type receives the `ExceptionHandler` there;
+   - a constructor with three parameters that calls `parent::__construct($http, $config, $key)`
+     drops the handler without any message, and its `receive()` then throws
+     `UnrecognisedInboundDocument` and stops the batch on the first unrecognisable document.
+
+   Accept the `ExceptionHandler` as the fourth parameter and pass it to `parent::__construct()`.
+
 ## [2.3.0] - 2026-09-26
 
 ### Fixed

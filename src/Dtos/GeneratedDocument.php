@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Vimatech\EInvoicing\Dtos;
 
-use DOMDocument;
 use DOMElement;
 use DOMXPath;
 use Vimatech\EInvoicing\Enums\Format;
 use Vimatech\EInvoicing\Exceptions\EInvoicingException;
 use Vimatech\EInvoicing\Exceptions\NotImplemented;
 use Vimatech\EInvoicing\Formats\CiiGenerator;
+use Vimatech\EInvoicing\Formats\Support\Xml;
 use Vimatech\EInvoicing\Formats\UblGenerator;
 
 /**
@@ -111,21 +111,21 @@ final readonly class GeneratedDocument
             Format::FacturX => throw NotImplemented::format($format->value),
         };
 
-        $dom = new DOMDocument;
-        $previous = libxml_use_internal_errors(true);
-        $parsed = $contents !== '' && $dom->loadXML($contents, LIBXML_NONET);
-        libxml_clear_errors();
-        libxml_use_internal_errors($previous);
+        $dom = Xml::parse($contents);
+        $identifiers = false;
 
-        $xpath = new DOMXPath($dom);
-        $xpath->registerNamespace('cbc', UblGenerator::CBC);
-        $xpath->registerNamespace('rsm', CiiGenerator::RSM);
-        $xpath->registerNamespace('ram', CiiGenerator::RAM);
-        $identifiers = $parsed ? $xpath->query($number) : false;
+        if ($dom !== null) {
+            $xpath = new DOMXPath($dom);
+            $xpath->registerNamespace('cbc', UblGenerator::CBC);
+            $xpath->registerNamespace('rsm', CiiGenerator::RSM);
+            $xpath->registerNamespace('ram', CiiGenerator::RAM);
+            $identifiers = $xpath->query($number);
+        }
+
         $identifier = $identifiers !== false && $identifiers->length === 1 ? $identifiers->item(0) : null;
 
         if (! $identifier instanceof DOMElement
-            || ! in_array($dom->documentElement?->namespaceURI, $roots, true)) {
+            || ! in_array($dom?->documentElement?->namespaceURI, $roots, true)) {
             throw new EInvoicingException("The stored contents are not a {$format->value} document this package generates.");
         }
 

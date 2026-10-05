@@ -74,12 +74,7 @@ final class PeppolDriver extends AbstractHttpDriver
     {
         $response = $this->exchange(fn () => $this->request()->get($this->config->path('inbound', '/inbound')));
 
-        $documents = [];
-        foreach ($this->payloadList($response, 'documents') as $item) {
-            $documents[] = $this->toInbound($item);
-        }
-
-        return $documents;
+        return $this->inboundDocuments($this->payloadList($response, 'documents'), $this->toInbound(...));
     }
 
     public function capabilities(): NetworkCapabilities
@@ -112,12 +107,13 @@ final class PeppolDriver extends AbstractHttpDriver
     private function toInbound(array $item): InboundDocument
     {
         $messageId = $this->stringOrNull($item['id'] ?? $item['messageId'] ?? null) ?? '';
+        $contents = $this->decodeInbound($item['document'] ?? null, $messageId);
 
         return new InboundDocument(
             network: $this->key,
             messageId: $messageId,
-            format: Format::tryFrom($this->stringOrNull($item['format'] ?? null) ?? 'ubl') ?? Format::Ubl,
-            contents: $this->decodeInbound($item['document'] ?? null, $messageId),
+            format: $this->inboundFormat($item, $messageId, $contents),
+            contents: $contents,
             senderId: $this->stringOrNull($item['sender'] ?? null),
             receivedAt: new DateTimeImmutable,
             raw: $item,

@@ -6,6 +6,7 @@ namespace Vimatech\EInvoicing\Networks;
 
 use Closure;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Vimatech\EInvoicing\Contracts\EInvoiceNetwork;
 use Vimatech\EInvoicing\Enums\LifecycleStatus;
@@ -108,8 +109,8 @@ final class NetworkManager
         return match ($driver) {
             'null' => new NullDriver($key),
             'fake' => new FakeDriver($key),
-            'peppol' => new PeppolDriver($this->httpFactory(), $config, $key),
-            'fr_pdp' => new FrPdpDriver($this->httpFactory(), $config, $key),
+            'peppol' => new PeppolDriver($this->httpFactory(), $config, $key, $this->exceptionHandler()),
+            'fr_pdp' => new FrPdpDriver($this->httpFactory(), $config, $key, $this->exceptionHandler()),
             default => $this->resolveClass($driver, $config, $key),
         };
     }
@@ -124,7 +125,7 @@ final class NetworkManager
         }
 
         if (is_subclass_of($driver, AbstractHttpDriver::class)) {
-            return new $driver($this->httpFactory(), $config, $key);
+            return new $driver($this->httpFactory(), $config, $key, $this->exceptionHandler());
         }
 
         $instance = $this->container->make($driver, ['config' => $config, 'key' => $key]);
@@ -139,5 +140,10 @@ final class NetworkManager
     private function httpFactory(): HttpFactory
     {
         return $this->container->make(HttpFactory::class);
+    }
+
+    private function exceptionHandler(): ExceptionHandler
+    {
+        return $this->container->make(ExceptionHandler::class);
     }
 }

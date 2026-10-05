@@ -5,15 +5,22 @@ declare(strict_types=1);
 namespace Vimatech\EInvoicing\Networks;
 
 use Closure;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Throwable;
 use Vimatech\EInvoicing\Contracts\EInvoiceNetwork;
+use Vimatech\EInvoicing\Dtos\InboundDocument;
+use Vimatech\EInvoicing\Enums\Format;
 use Vimatech\EInvoicing\Enums\LifecycleStatus;
 use Vimatech\EInvoicing\Exceptions\EInvoicingException;
 use Vimatech\EInvoicing\Exceptions\InvalidDriverConfig;
 use Vimatech\EInvoicing\Exceptions\NetworkException;
+use Vimatech\EInvoicing\Exceptions\UnrecognisedInboundDocument;
+use Vimatech\EInvoicing\Formats\CiiGenerator;
+use Vimatech\EInvoicing\Formats\Support\Xml;
+use Vimatech\EInvoicing\Formats\UblGenerator;
 
 /**
  * Shared HTTP plumbing for REST-based partner networks.
@@ -31,6 +38,7 @@ abstract class AbstractHttpDriver implements EInvoiceNetwork
         protected readonly HttpFactory $http,
         array $config,
         protected readonly string $key,
+        private readonly ?ExceptionHandler $exceptions = null,
     ) {
         $this->config = new DriverConfig($key, $config);
     }
@@ -133,6 +141,68 @@ abstract class AbstractHttpDriver implements EInvoiceNetwork
         }
 
         return $decoded;
+    }
+
+    /**
+     * One document whose format cannot be established is reported and left
+     * out, so it never blocks the documents behind it in the inbox. Without an
+     * exception handler to report to, it stops the batch instead.
+     *
+     * @param  list<array<string, mixed>>  $items
+     * @param  Closure(array<string, mixed>): InboundDocument  $toDocument
+     * @return list<InboundDocument>
+     *
+     * @throws NetworkException
+     * @throws UnrecognisedInboundDocument
+     */
+    protected function inboundDocuments(array $items, Closure $toDocument): array
+    {
+        $documents = [];
+
+        foreach ($items as $item) {
+            try {
+                $documents[] = $toDocument($item);
+            } catch (UnrecognisedInboundDocument $e) {
+                if ($this->exceptions === null) {
+                    throw $e;
+                }
+
+                $this->exceptions->report($e);
+            }
+        }
+
+        return $documents;
+    }
+
+    /**
+     * A recognised declared format wins; otherwise the format is read from the
+     * contents, and never assumed.
+     *
+     * @param  array<string, mixed>  $item
+     *
+     * @throws UnrecognisedInboundDocument
+     */
+    protected function inboundFormat(array $item, string $messageId, string $contents): Format
+    {
+        $declared = $this->stringOrNull($item['format'] ?? null);
+        $format = ($declared === null ? null : Format::tryFrom($declared)) ?? $this->detectFormat($contents);
+
+        return $format ?? throw UnrecognisedInboundDocument::from($this->key, $messageId, $declared, $item);
+    }
+
+    private function detectFormat(string $contents): ?Format
+    {
+        if (str_starts_with($contents, '%PDF-')) {
+            return Format::FacturX;
+        }
+
+        $root = Xml::parse($contents)?->documentElement;
+
+        return match ([$root?->namespaceURI, $root?->localName]) {
+            [CiiGenerator::RSM, 'CrossIndustryInvoice'] => Format::Cii,
+            [UblGenerator::INVOICE_NS, 'Invoice'], [UblGenerator::CREDIT_NOTE_NS, 'CreditNote'] => Format::Ubl,
+            default => null,
+        };
     }
 
     protected function mapStatus(?string $providerStatus): LifecycleStatus

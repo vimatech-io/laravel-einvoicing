@@ -71,22 +71,20 @@ final class FrPdpDriver extends AbstractHttpDriver
     {
         $response = $this->exchange(fn () => $this->request()->get($this->config->path('inbound', '/inbox')));
 
-        $documents = [];
-        foreach ($this->payloadList($response, 'invoices') as $item) {
+        return $this->inboundDocuments($this->payloadList($response, 'invoices'), function (array $item): InboundDocument {
             $messageId = $this->stringOrNull($item['id'] ?? null) ?? '';
+            $contents = $this->decodeInbound($item['content'] ?? null, $messageId);
 
-            $documents[] = new InboundDocument(
+            return new InboundDocument(
                 network: $this->key,
                 messageId: $messageId,
-                format: Format::tryFrom($this->stringOrNull($item['format'] ?? null) ?? 'cii') ?? Format::Cii,
-                contents: $this->decodeInbound($item['content'] ?? null, $messageId),
+                format: $this->inboundFormat($item, $messageId, $contents),
+                contents: $contents,
                 senderId: $this->stringOrNull($item['supplier'] ?? null),
                 receivedAt: new DateTimeImmutable,
                 raw: $item,
             );
-        }
-
-        return $documents;
+        });
     }
 
     public function capabilities(): NetworkCapabilities
@@ -95,7 +93,7 @@ final class FrPdpDriver extends AbstractHttpDriver
 
         return new NetworkCapabilities(
             network: $this->key,
-            formats: [Format::Ubl, Format::Cii, Format::FacturX],
+            formats: [Format::Ubl, Format::Cii],
             countries: $countries === [] ? ['FR'] : $countries,
             canSend: true,
             canFetchStatus: true,
