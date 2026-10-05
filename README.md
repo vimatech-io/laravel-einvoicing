@@ -288,6 +288,30 @@ package will not hand your application a document it could not decode. If your p
 unencoded bodies, extend the driver and override `decodeInbound()`; do not make it accept both,
 since the two cannot be told apart and the wrong guess silently yields a corrupt invoice.
 
+Each `InboundDocument` carries a `format`. A `format` the partner declares that is a value of `Format`
+is used as declared. Otherwise it is read from the decoded contents, never assumed: a body starting
+with `%PDF-` is `Format::FacturX`; an XML document whose root is `CrossIndustryInvoice` in the CII
+namespace is `Format::Cii`; a root `Invoice` or `CreditNote` in its UBL namespace is `Format::Ubl`.
+A root with the right name but no namespace, or another namespace, is not taken for either. If you
+branch on `$inbound->format`, handle `Format::FacturX`.
+
+A document whose format can be neither read from the declaration nor recognised in its contents is not
+returned. It is reported to your exception handler as `Vimatech\EInvoicing\Exceptions\UnrecognisedInboundDocument`
+(properties `network`, `messageId`, `declaredFormat` and `raw`, the provider's entry with its body still
+encoded), and the other documents of the batch are returned as usual. To keep or alert on them:
+
+```php
+use Vimatech\EInvoicing\Exceptions\UnrecognisedInboundDocument;
+
+$exceptions->reportable(function (UnrecognisedInboundDocument $e) {
+    // $e->network, $e->messageId, $e->declaredFormat, $e->raw
+});
+```
+
+This applies to drivers built by the package (`peppol`, `fr_pdp`, or an `AbstractHttpDriver`
+subclass referenced by class). A driver you build by hand, or in an `extend()` factory, without an
+exception handler throws the exception instead, which stops the batch.
+
 ## Configuration
 
 `config/einvoicing.php` declares the available **networks**, the **country → network** routing
