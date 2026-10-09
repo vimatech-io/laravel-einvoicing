@@ -16,7 +16,7 @@ enum Format: string
     /** OASIS UBL 2.1, Peppol BIS Billing 3.0 profile. */
     case Ubl = 'ubl';
 
-    /** UN/CEFACT Cross Industry Invoice, EN 16931 compliant. */
+    /** UN/CEFACT Cross Industry Invoice, EN 16931 syntax. */
     case Cii = 'cii';
 
     /** Factur-X / ZUGFeRD: hybrid PDF/A-3 + CII (deferred). */
