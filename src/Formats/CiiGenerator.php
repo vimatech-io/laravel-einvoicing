@@ -18,7 +18,7 @@ use Vimatech\EInvoicing\Formats\Support\InvoiceValidator;
 
 /**
  * Native generator for UN/CEFACT Cross Industry Invoice (CII), EN 16931
- * compliant. Implemented purely with ext-dom.
+ * syntax. Implemented purely with ext-dom.
  *
  * This emits the EN 16931 core subset shared with Factur-X; the same XML can
  * later be embedded into a PDF/A-3 by a dedicated Factur-X module.
