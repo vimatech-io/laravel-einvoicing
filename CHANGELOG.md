@@ -7,6 +7,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- `composer.json`: the package `homepage` now points to `https://vimatech.io/open-source/`, and the author entry carries a `homepage` (`https://adelzemzemi.com/`). Packagist metadata only, no code change.
+
 ## [2.4.0] - 2026-10-05
 
 ### Fixed

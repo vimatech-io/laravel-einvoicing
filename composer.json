@@ -11,7 +11,7 @@
         "en16931",
         "invoice"
     ],
-    "homepage": "https://github.com/vimatech-io/laravel-einvoicing",
+    "homepage": "https://vimatech.io/open-source/",
     "support": {
         "issues": "https://github.com/vimatech-io/laravel-einvoicing/issues",
         "source": "https://github.com/vimatech-io/laravel-einvoicing",
@@ -21,7 +21,8 @@
     "authors": [
         {
             "name": "Adel Zemzemi",
-            "email": "hello@adelzemzemi.com"
+            "email": "hello@adelzemzemi.com",
+            "homepage": "https://adelzemzemi.com/"
         }
     ],
     "require": {
